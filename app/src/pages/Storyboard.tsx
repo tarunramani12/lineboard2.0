@@ -4,6 +4,8 @@ import { useQueryClient } from '@tanstack/react-query'
 import { navState, type Ctx } from '../components/ProjectLayout'
 import { Badge, Banner, EmptyState, Icon, Permission, SceneChip, useOnline } from '../components/ui'
 import { friendlyError } from '../lib/errors'
+import { useFolded } from '../lib/folded'
+import { FoldAll } from '../components/FoldAll'
 import { isOwnerOrAdmin, levelFor, useScenes } from '../lib/project'
 import { SECTIONS } from '../lib/sections'
 import { canEditShotsFor, shotLabel, useShots, type Shot } from '../lib/shots'
@@ -299,6 +301,7 @@ function FrameEditor({ shot, label, scene, frame, canEdit, urls, usedByOthers, c
 
 export default function Storyboard() {
   const { b, pid } = useOutletContext<Ctx>()
+  const fold = useFolded(pid, 'storyboard')
   const qc = useQueryClient()
   const online = useOnline()
   const scenes = useScenes(pid).data ?? []
@@ -418,6 +421,7 @@ export default function Storyboard() {
       {error && <p className="lb-error" role="alert">{error}</p>}
       {!shots.length && <EmptyState title="No shots yet" action={<Link className="lb-btn" to="../shots">Open the Shot list</Link>}>Frames belong to shots. Add shots in the shot list first.</EmptyState>}
 
+      <div className="lb-row" style={{ justifyContent: 'flex-start' }}><FoldAll ids={scenes.filter((sc) => (bySceneId.get(sc.id)?.length ?? 0) > 0).map((sc) => sc.id)} fold={fold} /></div>
       <div className="lb-sheet lb-boards">
         {scenes.map((sc, si) => {
           const list = bySceneId.get(sc.id) ?? []
@@ -425,10 +429,14 @@ export default function Storyboard() {
           return (
             <section key={sc.id} className="lb-shotscene" aria-label={`Scene ${sc.display_number ?? si + 1}`}>
               <header className="lb-shotscene-head">
-                <SceneChip n={sc.display_number} position={si + 1} omitted={sc.status === 'omitted'} />
-                <h2 className="lb-sp-h">{sc.heading || <span className="lb-muted">No heading yet</span>}</h2>
+                <button className="lb-fold" aria-expanded={fold.isOpen(sc.id)} onClick={() => fold.toggle(sc.id)}>
+                  <Icon name="chev" />
+                  <SceneChip n={sc.display_number} position={si + 1} omitted={sc.status === 'omitted'} />
+                  <h2 className="lb-sp-h">{sc.heading || <span className="lb-muted">No heading yet</span>}</h2>
+                  <span className="lb-caption lb-shotcount">{list.length} {list.length === 1 ? 'shot' : 'shots'}</span>
+                </button>
               </header>
-              <div className="lb-grid">
+              {fold.isOpen(sc.id) && <div className="lb-grid">
                 {list.map((s, i) => {
                   const f = frames.get(s.id)
                   const editable = canEditShotsFor(b, s.team_id)
@@ -445,7 +453,7 @@ export default function Storyboard() {
                     </button>
                   )
                 })}
-              </div>
+              </div>}
             </section>
           )
         })}

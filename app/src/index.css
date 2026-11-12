@@ -686,3 +686,89 @@ body.lb-row-dragging { user-select: none; -webkit-user-select: none; cursor: gra
 .lb-csshot.is-dropped .lb-csshot-text { text-decoration: line-through; color: var(--ink-subtle); }
 .lb-csshot .lb-seg button { min-height: 44px; padding: 0 12px; font-size: 15px; }
 @media (max-width: 700px) { .lb-csshot { grid-template-columns: auto minmax(0, 1fr); } .lb-csshot-end { grid-column: 1 / -1; justify-content: flex-start; } }
+
+/* ---- Phone pass (2026-11): density, tidy rows, no zoom on focus ---- */
+/* iOS zooms the whole page when a field with text under 16px gets focus, and it stays zoomed. */
+@media (pointer: coarse) { input, select, textarea, .lb-input, .lb-choice { font-size: 16px; } }
+body { -webkit-text-size-adjust: 100%; text-size-adjust: 100%; }
+.lb-shotmeta { display: contents; }
+@media (max-width: 639px) {
+  .lb-layout { padding: 12px; padding-bottom: 92px; }
+  .lb-card { padding: 12px; }
+  .lb-title { font-size: 24px; }
+  .lb-heading { font-size: 18px; }
+  /* top bar: one slim row for the brand and buttons, the project name under it */
+  .lb-stripes { width: 28px; }
+  .lb-topbar { min-height: 52px; gap: 8px; }
+  .lb-topbar > div:not(.lb-grow) { padding: 4px 0; }
+  .lb-brand-mark { height: 26px; } .lb-brand-word { font-size: 21px; }
+  .lb-topbar .lb-body-strong { font-size: 17px; }
+  .lb-topbar .lb-btn { padding: 0 12px; font-size: 13px; }
+  .lb-topbar .lb-grow { padding: 0 0 6px 12px; }
+  /* overview tiles: small number, two across when they fit */
+  .lb-cards { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px; }
+  .lb-cards > :first-child { grid-column: 1 / -1; }
+  .lb-number-lg { font-size: 30px; }
+  /* shot list: number, description and status on the first line, size, lens and team on a muted second line */
+  .lb-shotrow { grid-template-columns: 40px minmax(0, 1fr) auto; column-gap: 8px; row-gap: 0; padding: 6px 12px; min-height: 0; }
+  .lb-shotdesc { flex-wrap: nowrap; min-height: 28px; font-weight: 700; min-width: 0; }
+  .lb-shotdesc > :first-child { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .lb-shotmeta { display: flex; align-items: center; gap: 0; grid-column: 2 / -1; font-size: 12px; color: var(--ink-muted); min-width: 0; white-space: nowrap; overflow: hidden; }
+  .lb-shotmeta .lb-shotcell { overflow: hidden; text-overflow: ellipsis; }
+  .lb-shotmeta .lb-shotcell + .lb-shotcell::before { content: "\00b7"; margin: 0 6px; }
+  .lb-shotmeta .lb-shotteam { margin-left: auto; padding-left: 8px; font-size: 12px; flex-shrink: 0; }
+  .lb-shotteamname { display: none; }
+  .lb-shotmeta .lb-shotcell.lb-shotteam::before { content: none; }
+  .lb-shotcount, .lb-phone-hide { display: none; }
+  .lb-shotscene-head { flex-wrap: nowrap; gap: 8px; }
+  .lb-shotscene-head .lb-sp-h { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .lb-shotscene-head .lb-grow { display: none; }
+  .lb-shotscene { margin-top: 10px; }
+  .lb-shotrow > .lb-shotcell:has(.lb-shotstatus) { grid-column: 3; grid-row: 1; }
+  .lb-shotstatus { font-size: 0; gap: 0; }
+  .lb-shotstatus .lb-icon, .lb-shotstatus .lb-ring { width: 18px; height: 18px; font-size: 14px; }
+  .lb-shottools { display: none; }
+  .lb-shotscene-head { margin: 0 12px 2px; }
+}
+/* Landscape phones are short: give the height back to the page. */
+@media (pointer: coarse) and (max-height: 500px) {
+  .lb-topbar { min-height: 44px; }
+  .lb-stripes { width: 60px; }
+  .lb-brand-mark { height: 24px; } .lb-brand-word { font-size: 20px; }
+  .lb-topbar > div:not(.lb-grow) { padding: 2px 0; }
+  .lb-topbar .lb-body-strong { font-size: 17px; }
+  .lb-topbar .lb-crumb { font-size: 12px; }
+  .lb-layout { padding-top: 10px; padding-bottom: 10px; }
+  .lb-title { font-size: 22px; }
+}
+
+/* Folding scenes on the Shot list and Storyboard */
+.lb-fold { display: flex; align-items: center; gap: 8px; flex: 1; min-width: 0; min-height: 44px; padding: 0; border: 0; background: transparent; color: inherit; font: inherit; text-align: left; cursor: pointer; }
+.lb-fold:focus-visible { outline: 3px solid var(--ink); outline-offset: 2px; }
+.lb-fold .lb-icon { width: 20px; height: 20px; flex-shrink: 0; transition: transform .12s ease; }
+.lb-fold[aria-expanded="true"] .lb-icon:first-child { transform: rotate(90deg); }
+.lb-fold .lb-sp-h { margin: 0; }
+@media (prefers-reduced-motion: reduce) { .lb-fold .lb-icon { transition: none; } }
+
+/* ---- Buttons: black, a little smaller (2026-11). The tap area stays 44px through ::after. ---- */
+.lb-btn { min-height: 36px; padding: 0 14px; font-size: 16px; position: relative; }
+.lb-btn--sm, .lb-sd-tools .lb-btn, .lb-sd-end .lb-btn { min-height: 30px; padding: 0 10px; font-size: 14px; min-width: 0; }
+.lb-btn::after { content: ""; position: absolute; left: 0; right: 0; top: 50%; height: max(100%, 44px); transform: translateY(-50%); }
+.lb-btn:where(:not(.lb-btn--quiet):not(.lb-btn--danger):not([aria-pressed])) { background: var(--ink); color: var(--on-ink); box-shadow: var(--shadow-button); }
+.lb-btn[aria-pressed="false"] { background: var(--paper); color: var(--ink); box-shadow: inset 0 0 0 2px var(--ink); }
+.lb-btn[aria-pressed="true"] { background: var(--ink); color: var(--on-ink); }
+.lb-btn--quiet { color: var(--ink); }
+.lb-btn:disabled { opacity: .35; }
+/* where a button sits on a dark surface it keeps its own light colours */
+.lb-scenehead .lb-btn, .lb-bottombar .lb-btn, .lb-side .lb-btn { background: var(--on-ink); color: var(--ink); }
+.lb-topbar .lb-btn { min-height: 36px; }
+@media (hover: hover) { .lb-btn:where(:not(.lb-btn--quiet):not(.lb-btn--danger):not([aria-pressed]):not(:disabled)):hover { background: color-mix(in srgb, var(--ink) 82%, var(--on-ink)); } }
+@media (pointer: coarse) { .lb-matrix select { font-size: 16px; } }
+
+/* Storyboard columns follow the room the list has, not the screen: 3 across when there is plenty of room, 2 on a wide phone or a phone turned sideways, 1 on a narrow one. */
+.lb-boards { container-type: inline-size; container-name: boards; }
+@container boards (max-width: 739px) { .lb-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
+@container boards (max-width: 479px) { .lb-grid { grid-template-columns: minmax(0, 1fr); } }
+/* a phone turned sideways is wide but short: two across, never three */
+@media (pointer: coarse) and (max-height: 500px) { @container boards (min-width: 480px) { .lb-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); } } }
+@media (max-width: 520px) { .lb-grid { gap: var(--space-3); padding-left: 12px; padding-right: 12px; } .lb-card-desc { display: block; } }

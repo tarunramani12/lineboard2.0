@@ -51,3 +51,6 @@ Test before saying something works: database suites, vitest, tsc, build, then th
 4. Supabase auth mail through Resend; Cloudflare Email Routing for the role addresses.
 5. Offline reading of project data.
 6. Paid plans before charging; Capacitor and store listings.
+
+## Phone and dual-screen review (how to repeat it)
+Seed a project through the normal client API (an account, `create_project`, `import_script`, shots, `detect_cast`, a schedule with days, call sheets), then open every page with Playwright and system Chrome using touch and mobile emulation at these sizes: 390x844 and 360x640 (phones), 844x390 (phone landscape), 540x720 and 720x540 (dual-screen single panel), 1114x720 (dual-screen spanned). For each page record horizontal overflow, fields under 16px (iOS zoom), tiny text and screenshots. The 2026-11-13 pass found no sideways scrolling; the main fault was 15px form fields. Delete the test accounts afterwards (sign in as each and call `delete_my_account`, or with the owner's approval run a delete in the SQL Editor). Note: buttons are 30 to 36px tall with a 44px tap area made by an invisible `::after`, so audits that measure the box height will report them as small.

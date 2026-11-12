@@ -17,6 +17,8 @@ import {
 } from '../lib/shots'
 import { removeFolder } from '../lib/storyboard'
 import { armRowDrag } from '../lib/dragGate'
+import { FoldAll } from '../components/FoldAll'
+import { useFolded } from '../lib/folded'
 import { supabase } from '../lib/supabase'
 import type { Scene } from '../lib/types'
 
@@ -272,6 +274,7 @@ export default function ShotList() {
   const canAdd = teamsIEdit(b).length > 0
   const [dlg, setDlg] = useState<{ shotId: string | null; sceneId: string; after: string | null } | null>(null)
   const [showOmitted, setShowOmitted] = useState<Set<string>>(new Set())
+  const fold = useFolded(pid, 'shots')
   const [error, setError] = useState<string | null>(null)
 
   const bySceneId = useMemo(() => {
@@ -359,11 +362,12 @@ export default function ShotList() {
   return (
     <>
       {head}
-      <div className="lb-row" style={{ justifyContent: 'flex-end' }}>
+      <div className="lb-row" style={{ justifyContent: 'space-between' }}>
+        <FoldAll ids={scenes.filter((sc) => (bySceneId.get(sc.id)?.length ?? 0) > 0).map((sc) => sc.id)} fold={fold} />
         <ReportButton label="Download shot list PDF" file={fileSafe(b.project.name) + '-shot-list'} disabled={total === 0}
           build={(size) => buildReportPdf(shotsReport({ project: b.project.name, size, scenes: scenesQ.data ?? [], shots, teams: b.teams }))} />
       </div>
-      <p className="lb-caption">Shots are grouped by scene and numbered scene then shot, such as 42-3. The team that owns a shot edits it. Only the AD team changes whether a shot is planned, done or dropped.</p>
+      <p className="lb-caption lb-phone-hide">Shots are grouped by scene and numbered scene then shot, such as 42-3. The team that owns a shot edits it. Only the AD team changes whether a shot is planned, done or dropped.</p>
       {total > 0 && (
         <div className="lb-shotprogress" aria-label="Progress">
           <span><b>{counts.done}</b> done · <b>{counts.dropped}</b> dropped · <b>{counts.planned}</b> planned</span>
@@ -394,13 +398,17 @@ export default function ShotList() {
             return (
               <section key={sc.id} className="lb-shotscene" aria-label={`Scene ${sc.display_number ?? si + 1}`}>
                 <header className="lb-shotscene-head">
-                  <SceneChip n={sc.display_number} position={si + 1} omitted={omitted} />
-                  <h2 className="lb-sp-h">{sc.heading || <span className="lb-muted">No heading yet</span>}</h2>
-                  <span className="lb-caption">{list.length} {list.length === 1 ? 'shot' : 'shots'}</span>
+                  <button className="lb-fold" aria-expanded={fold.isOpen(sc.id)} onClick={() => fold.toggle(sc.id)}>
+                    <Icon name="chev" />
+                    <SceneChip n={sc.display_number} position={si + 1} omitted={omitted} />
+                    <h2 className="lb-sp-h">{sc.heading || <span className="lb-muted">No heading yet</span>}</h2>
+                    <span className="lb-caption lb-shotcount">{list.length} {list.length === 1 ? 'shot' : 'shots'}</span>
+                  </button>
                   {sc.revised_in ? <Badge kind="conflict" ><Icon name="warn" /> Scene revised ({revisionLabel(sc.revised_in)}). Check these shots.</Badge> : null}
-                  <span className="lb-grow" />
                   {canAdd && !omitted && <button className="lb-btn lb-btn--sm" onClick={() => setDlg({ shotId: null, sceneId: sc.id, after: null })}><Icon name="plus" /> Add shot</button>}
                 </header>
+                {fold.isOpen(sc.id) && (
+                <>
                 {list.length === 0 && <p className="lb-caption lb-shotempty">No shots yet.</p>}
                 {list.map((s, i) => {
                   const editable = canEditShotsFor(b, s.team_id)
@@ -417,10 +425,12 @@ export default function ShotList() {
                         {s.description || <span className="lb-muted">No description</span>}
                         {s.silent && <Badge kind="plain">Silent</Badge>}
                       </button>
-                      <span className="lb-shotcell">{[sizeName(s.size), s.movement].filter(Boolean).join(' · ') || <span className="lb-muted">–</span>}</span>
-                      <span className="lb-shotcell">{s.lens || <span className="lb-muted">–</span>}</span>
-                      <span className="lb-shotcell lb-shotteam" title={editable ? 'Your team can edit this shot' : 'Owned by another team. Read only.'}>
-                        <Icon name={editable ? 'pencil' : 'lock'} /> {teamName(s.team_id)}
+                      <span className="lb-shotmeta">
+                        <span className="lb-shotcell">{[sizeName(s.size), s.movement].filter(Boolean).join(' · ') || <span className="lb-muted">–</span>}</span>
+                        <span className="lb-shotcell">{s.lens || <span className="lb-muted">–</span>}</span>
+                        <span className="lb-shotcell lb-shotteam" title={editable ? 'Your team can edit this shot' : 'Owned by another team. Read only.'}>
+                          <Icon name={editable ? 'pencil' : 'lock'} /> <span className="lb-shotteamname">{teamName(s.team_id)}</span>
+                        </span>
                       </span>
                       <span className="lb-shotcell"><StatusMark status={s.status} /></span>
                       <span className="lb-shottools">
@@ -438,6 +448,8 @@ export default function ShotList() {
                 })}
                 {list.length > 0 && canAdd && !omitted && (
                   <div className="lb-shotend"><button className="lb-btn lb-btn--sm lb-btn--quiet" onClick={() => setDlg({ shotId: null, sceneId: sc.id, after: list[list.length - 1].id })}><Icon name="plus" /> Add a shot after {shotLabel(sc, si, list.length)}</button></div>
+                )}
+                </>
                 )}
               </section>
             )

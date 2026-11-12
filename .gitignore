@@ -1,0 +1,11 @@
+# Secrets: never commit
+.env
+.env.*
+*.pem
+*.key
+supabase/.temp/
+supabase/.env
+.DS_Store
+
+# Local tool settings
+.mcp.json

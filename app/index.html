@@ -1,0 +1,30 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <link rel="icon" href="/favicon.ico?v=4" sizes="16x16 32x32" />
+    <link rel="icon" href="/icons/tab-32.png?v=4" type="image/png" sizes="32x32" />
+    <link rel="icon" href="/icons/tab-16.png?v=4" type="image/png" sizes="16x16" />
+    <link rel="icon" href="/icons/tab.svg?v=4" type="image/svg+xml" sizes="any" />
+    <script>
+      // The home-screen icon is only offered to iPhone and iPad. Desktop Safari would otherwise use it (a white tile) in the tab.
+      if (/iPad|iPhone|iPod/.test(navigator.userAgent) || (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1)) {
+        var l = document.createElement('link'); l.rel = 'apple-touch-icon'; l.href = '/icons/apple-touch-icon.png?v=4'; document.head.appendChild(l);
+      }
+    </script>
+    <meta name="apple-mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-title" content="LineBoard" />
+    <meta property="og:title" content="LineBoard 2.0" />
+    <meta property="og:description" content="From script to call sheet." />
+    <meta property="og:image" content="/logo/lineboard-logo-light.png" />
+    <meta name="twitter:card" content="summary" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
+    <title>LineBoard 2.0</title>
+    <meta name="theme-color" content="#f3f3f3" media="(prefers-color-scheme: light)" />
+    <meta name="theme-color" content="#000000" media="(prefers-color-scheme: dark)" />
+  </head>
+  <body>
+    <div id="root"></div>
+    <script type="module" src="/src/main.tsx"></script>
+  </body>
+</html>

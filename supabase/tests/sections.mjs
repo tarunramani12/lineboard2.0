@@ -1,0 +1,27 @@
+import { PGlite } from '@electric-sql/pglite';
+import fs from 'node:fs';
+const [early, late] = [process.argv.slice(2, 5), process.argv.slice(5)];
+const db = new PGlite();
+await db.exec(`
+  create role anon nologin; create role authenticated nologin; create schema auth;
+  create table auth.users (id uuid primary key default gen_random_uuid(), email text, email_confirmed_at timestamptz default now(), raw_user_meta_data jsonb default '{}');
+  create function auth.uid() returns uuid language sql stable as $$ select nullif(current_setting('request.jwt.claim.sub', true), '')::uuid $$;
+  grant usage on schema auth to anon, authenticated; grant usage on schema public to anon, authenticated;`);
+let pass = 0, fail = 0;
+const ok = (n, c) => { c ? pass++ : fail++; console.log(`${c ? 'PASS' : 'FAIL'}  ${n}`); };
+const as = async (uid, sql, p = []) => { await db.exec('set role authenticated'); await db.query(`select set_config('request.jwt.claim.sub',$1,false)`, [uid]); try { return (await db.query(sql, p)).rows } finally { await db.exec('reset role') } };
+for (const f of early) await db.exec(fs.readFileSync(f, 'utf8'));
+const O = (await db.query(`insert into auth.users (email) values ('o@example.com') returning id`)).rows[0].id;
+const old = (await as(O, `select create_project('Before') id`))[0].id;
+const cam = (await db.query(`select id from teams where project_id=$1 and name='Camera'`, [old])).rows[0].id;
+await db.query(`update team_section_access set level='edit' where team_id=$1 and section='props_equipment'`, [cam]);
+for (const f of late) await db.exec(fs.readFileSync(f, 'utf8'));
+const lv = async (t, s) => (await db.query(`select level from team_section_access where team_id=$1 and section=$2`, [t, s])).rows[0]?.level;
+ok('an existing team keeps its Props access', (await lv(cam, 'props')) === 'edit');
+ok('and gets the same level for Equipment', (await lv(cam, 'equipment')) === 'edit');
+ok('every existing team has 8 sections', (await db.query(`select count(*)::int n from team_section_access where team_id in (select id from teams where project_id=$1) group by team_id`, [old])).rows.every(r => r.n === 8));
+const fresh = (await as(O, `select create_project('After') id`))[0].id;
+const rows = (await db.query(`select section, level from team_section_access where team_id=(select id from teams where project_id=$1 and name='Art')`, [fresh])).rows;
+ok('a new project gives each team 8 sections', rows.length === 8 && rows.some(r => r.section === 'equipment') && rows.some(r => r.section === 'props') && !rows.some(r => r.section === 'props_equipment'));
+ok('Props and Equipment start at none for a new team', rows.filter(r => ['props', 'equipment'].includes(r.section)).every(r => r.level === 'none'));
+console.log(`\n${pass} passed, ${fail} failed`); process.exit(fail ? 1 : 0);

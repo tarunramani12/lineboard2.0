@@ -1,0 +1,38 @@
+// Turn database and auth errors into plain sentences that say what happened and what to do.
+export function friendlyError(err: unknown): string {
+  const raw = err instanceof Error ? err.message : typeof err === 'object' && err && 'message' in err ? String((err as { message: unknown }).message) : String(err)
+  const m = raw.toLowerCase()
+  if (m.includes('code_not_found')) return 'That code does not exist. Check the letters and try again.'
+  if (m.includes('code_expired')) return 'This code has expired. Ask the person who sent it for a new one.'
+  if (m.includes('code_revoked')) return 'This code was revoked. Ask the person who sent it for a new one.'
+  if (m.includes('already_member')) return 'You are already on this project. Open it from your projects list.'
+  if (m.includes('team_not_in_project')) return 'That team is not part of this project. Choose one from the list.'
+  if (m.includes('request_not_found')) return 'This request was already answered or withdrawn.'
+  if (m.includes('not_allowed')) return 'Only the owner, an admin or the head of that team can answer this request.'
+  if (m.includes('invalid login credentials')) return 'The email or password is wrong. Check both and try again.'
+  if (m.includes('email not confirmed')) return 'Confirm your email first. Open the message we sent and follow the link.'
+  if (m.includes('user already registered')) return 'An account with this email already exists. Sign in instead.'
+  if (m.includes('rate limit') || m.includes('too many')) return 'Too many attempts. Wait a few minutes and try again.'
+  if (m.includes('failed to fetch') || m.includes('network')) return 'No connection. Check your network and try again.'
+  if (m.includes('duplicate key')) return 'That already exists.'
+  if (m.includes('row-level security') || m.includes('permission denied')) return 'You do not have permission to do that.'
+  if (m.includes('lock_lost')) return 'Your hold on this scene ran out, or someone else took it. Your text is still here.'
+  if (m.includes('rev_conflict')) return 'Someone saved this scene while you were writing. Your text is still here. Load the latest version to compare.'
+  if (m.includes('bad_elements')) return 'The scene text could not be read. Check it and try again.'
+  if (m.includes('you cannot edit this scene')) return 'You do not have edit access to this scene.'
+  if (m.includes('image_cap_reached')) return 'This project has reached its storyboard size limit. Delete a frame, or ask the owner to raise the limit.'
+  if (m.includes('bad_frame')) return 'The frame could not be saved. Close it and try again.'
+  if (m.includes('scene_busy')) return 'Someone is editing one of the scenes in this draft. Wait until they finish, then apply the draft again.'
+  if (m.includes('bad_plan')) return 'The new draft could not be applied. Go back, check the matches, and try again.'
+  if (m.includes('only the owner can apply')) return 'Only the owner can apply a new draft.'
+  if (m.includes('cut scenes are marked omitted')) return 'The script is locked, so cut scenes are marked omitted, not deleted.'
+  if (m.includes('import_needs_matching')) return 'This script is locked. A new draft of a locked script needs the matching step, which is not built yet.'
+  if (m.includes('import_too_large')) return 'That script has more than 2000 scenes. Check that it is the right file.'
+  if (m.includes('bad_import')) return 'The script could not be read into scenes. Check the file and try again.'
+  if (m.includes('only the owner can import')) return 'Only the owner can import a script.'
+  if (m.includes('use lock script')) return 'Lock the script with the Lock script button, which numbers every scene first.'
+  if (m.includes('only the owner can lock')) return 'Only the owner can lock or unlock the script.'
+  if (m.includes('only the owner or an admin can start a revision')) return 'Only the owner or an admin can start a revision.'
+  if (m.includes('script is locked')) return 'The script is locked. Unlock it first, or mark the scene omitted instead.'
+  return raw.replace(/^error:\s*/i, '')
+}

@@ -4,6 +4,7 @@ import { useQuery, useQueryClient } from '@tanstack/react-query'
 import type { Ctx } from '../components/ProjectLayout'
 import { Badge, Dialog, EmptyState, Field, Icon, Permission, rowOpen, useAction } from '../components/ui'
 import { friendlyError } from '../lib/errors'
+import { kickEmail } from '../lib/email'
 import { usePendingJoinRequests, type PendingJoinRequest } from '../lib/joinRequests'
 import {
   hodTeamIds, isOwner, isOwnerOrAdmin, useInvitesAndCodes, useScenes, type Bundle, type PersonRow,
@@ -65,7 +66,7 @@ function JoinRequests({ pid }: { pid: string }) {
     setBusy(r.id); setError(null)
     const { error: e } = await supabase.rpc('decide_join_request', { rid: r.id, approve })
     setBusy(null)
-    if (e) setError(friendlyError(e))
+    if (e) setError(friendlyError(e)); else kickEmail()
     for (const k of ['join-requests', 'project', 'castcrew', 'invites-codes']) void qc.invalidateQueries({ queryKey: [k, pid] })
   }
   return (

@@ -3,6 +3,7 @@ import { Link, Navigate, useLocation, useNavigate } from 'react-router-dom'
 import { useQuery, useQueryClient } from '@tanstack/react-query'
 import { passwordProblem, useAuth } from '../lib/auth'
 import { friendlyError } from '../lib/errors'
+import { kickEmail } from '../lib/email'
 import { supabase, supabaseConfigured } from '../lib/supabase'
 import { Badge, Banner, Choice, Dialog, EmptyState, Field, Icon, Wordmark, useAction, useOnline } from '../components/ui'
 import { CREW_ROLES } from '../lib/castcrew'
@@ -323,6 +324,7 @@ export function Join() {
     const ok = await run(async () => {
       const { error } = await supabase.rpc('request_to_join', { join_code: code, team_in: team, role_in: role })
       if (error) throw error
+      kickEmail()
       return true
     }, friendlyError)
     if (ok && found) {

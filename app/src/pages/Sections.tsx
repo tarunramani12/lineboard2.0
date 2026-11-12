@@ -3,8 +3,11 @@ import { Link, useNavigate, useOutletContext, useParams } from 'react-router-dom
 import { useQueryClient } from '@tanstack/react-query'
 import type { Ctx } from '../components/ProjectLayout'
 import { navState } from '../components/ProjectLayout'
-import { Dialog, EmptyState, Field, Icon, Permission, rowOpen, useAction } from '../components/ui'
+import { Badge, Dialog, EmptyState, Field, Icon, Permission, rowOpen, useAction } from '../components/ui'
 import { friendlyError } from '../lib/errors'
+import { useAuth } from '../lib/auth'
+import { KIND_LABEL, MAIL_DOMAIN, senderPreview, STATUS_LABEL, useOutbox } from '../lib/email'
+import type { Project } from '../lib/types'
 import { isOwner, isOwnerOrAdmin, levelFor } from '../lib/project'
 import { SECTIONS } from '../lib/sections'
 import { removeFolder } from '../lib/storyboard'
@@ -109,6 +112,7 @@ export function ExportSettings() {
           <p className="lb-caption"><Icon name="lock" /> Only the owner and admins can download a full backup. Script, shot list and storyboard exports are on their own pages.</p>
         )}
       </section>
+      {isOwnerOrAdmin(b) && <MailSettings pid={pid} project={b.project} owner={isOwner(b)} />}
       <section className="lb-card lb-stack" aria-label="PDFs and files">
         <h2 className="lb-heading">PDFs for each department</h2>
         <p className="lb-caption">Each department downloads its own file from its own page, with the paper size you choose. You only see the pages you have access to. A lock means your team cannot open that page.</p>
@@ -186,5 +190,67 @@ export function ExportSettings() {
         </Dialog>
       )}
     </>
+  )
+}
+
+/** Who the project's emails come from. Only the owner changes it; admins can see it and what was sent. */
+function MailSettings({ pid, project, owner }: { pid: string; project: Project; owner: boolean }) {
+  const qc = useQueryClient()
+  const { user } = useAuth()
+  const act = useAction()
+  const [id, setId] = useState(project.mail_id ?? '')
+  const [name, setName] = useState(project.mail_name)
+  const [reply, setReply] = useState(project.reply_to)
+  const [saved, setSaved] = useState(false)
+  const box = useOutbox(pid, true)
+  const rows = box.data ?? []
+  const waiting = rows.filter((r) => r.status !== 'sent').length
+  const shown = senderPreview({ name: project.name, mail_id: id.trim().toLowerCase() || null, mail_name: name.trim() })
+  async function save() {
+    setSaved(false)
+    const ok = await act.run(async () => {
+      const { error } = await supabase.rpc('set_mail_identity', { pid, new_id: id, new_name: name, new_reply: reply })
+      if (error) throw error
+      return true
+    }, friendlyError)
+    if (ok) { setSaved(true); void qc.invalidateQueries({ queryKey: ['project', pid] }) }
+  }
+  return (
+    <section className="lb-card lb-stack" aria-label="Send notifications as">
+      <h2 className="lb-heading">Send notifications as</h2>
+      <p>Emails about this project, such as requests to join and call sheets, come from an address at {MAIL_DOMAIN}. Replies go to the address you choose below, so they reach you.</p>
+      {project.email_paused && <p className="lb-error" role="alert">Email for this project is paused. Contact LineBoard support.</p>}
+      <p className="lb-caption">What people will see: <strong>{shown}</strong></p>
+      {owner ? (
+        <div className="lb-stack">
+          <Field label="Sending name" value={id} maxLength={30} autoCapitalize="none" autoCorrect="off" spellCheck={false}
+            hint={`Letters, numbers and hyphens. The address becomes ${id.trim().toLowerCase() || 'name'}@${MAIL_DOMAIN}. Leave it empty to send from noreply@${MAIL_DOMAIN}.`}
+            onChange={(e) => { setId(e.target.value); setSaved(false) }} />
+          <Field label="Display name" value={name} maxLength={60} placeholder={project.name}
+            hint="Shown before the address. We add (via LineBoard) so people know where it came from." onChange={(e) => { setName(e.target.value); setSaved(false) }} />
+          <Field label="Reply address" type="email" value={reply} maxLength={200} placeholder={user?.email ?? ''}
+            hint="Where replies go. Empty means your account email." onChange={(e) => { setReply(e.target.value); setSaved(false) }} />
+          <div className="lb-row">
+            <button className="lb-btn lb-btn--primary" disabled={act.busy} onClick={save}>{act.busy ? 'Saving' : 'Save'}</button>
+            {saved && <span className="lb-caption" role="status">Saved.</span>}
+          </div>
+          {act.error && <p className="lb-error" role="alert">{act.error}</p>}
+        </div>
+      ) : (
+        <p className="lb-caption"><Icon name="lock" /> Only the owner can change this.</p>
+      )}
+      <h3 className="lb-heading" style={{ fontSize: 16, margin: 0 }}>Recent email {waiting > 0 && <Badge kind="stale">{waiting} not sent yet</Badge>}</h3>
+      {rows.length === 0 ? <p className="lb-caption">Nothing sent yet.</p> : (
+        <ul className="lb-unlist">
+          {rows.slice(0, 8).map((r) => (
+            <li key={r.id} style={{ justifyContent: 'space-between', minHeight: 44, gap: 12 }}>
+              <span>{KIND_LABEL[r.kind] ?? r.kind} to {r.to_email}</span>
+              <span className="lb-caption">{STATUS_LABEL[r.status]}</span>
+            </li>
+          ))}
+        </ul>
+      )}
+      <p className="lb-caption">Free plan limit: 40 emails a day for this project. Anything over waits until the next day.</p>
+    </section>
   )
 }

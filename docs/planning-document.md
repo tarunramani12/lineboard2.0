@@ -465,8 +465,8 @@ Email is how crew are alerted, because push does not work for home-screen web ap
 
 - Call sheet change alerts: sent when a published call sheet gets a new revision.
 - Retention reminders (section 21).
-- Use a free email service. Free tier limits are 3,000 emails a month and 100 a day, so the choice must be revisited if the daily cap binds.
-- Sender display: "Owner Name via LineBoard". Replies go to the owner. Delivery comes from LineBoard's own address, because mail sent as someone else's address fails sender checks.
+- Use a free email service. Decided: Resend, free plan (3,000 emails a month, 100 a day), with the domain lineboard.app verified. The app caps itself at 40 a day per project and 80 a day in total, so the free limit is never hit. Built so far: join requests and their answers; call sheets and invites are next. See `docs/email.md`.
+- Sender display: each project chooses a sending name, so mail comes from "Display name (via LineBoard) <name@lineboard.app>" (reserved and brand-like names are refused). Replies go to the owner's chosen reply address. Delivery comes from LineBoard's own address, because mail sent as someone else's address fails sender checks.
 - The email service must be named in the privacy policy.
 - Open: whether crew email addresses must stay inside the EU. The service currently considered stores account data in the United States.
 

@@ -7,7 +7,7 @@ export type SceneAccessMode = 'none' | 'selected' | 'all'
 
 export interface Project {
   id: string; name: string; owner_id: string; status: string
-  script_locked: boolean; draft_no: number; revision_no: number; image_cap_mb: number; created_at: string; last_active_at: string
+  script_locked: boolean; draft_no: number; revision_no: number; image_cap_mb: number; mail_id: string | null; mail_name: string; reply_to: string; mail_id_changed_at: string | null; email_paused: boolean; created_at: string; last_active_at: string
 }
 export interface Team { id: string; project_id: string; name: string; is_ad_team: boolean }
 export interface TeamAccess { team_id: string; section: SectionKey; level: AccessLevel }

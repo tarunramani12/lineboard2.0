@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { Link, NavLink, Outlet, useParams, useLocation } from 'react-router-dom'
 import { useAuth } from '../lib/auth'
 import { friendlyError } from '../lib/errors'
@@ -24,16 +24,29 @@ export function navState(b: Bundle, s: SectionDef): { locked: boolean; tag: stri
   return { locked: false, tag: null }
 }
 
-/** Phone only: every section as an icon in a fixed grid along the bottom, no scrolling. */
+/** Short names for the phone bar, where each item is narrow. */
+const DOCK_NAME: Record<string, string> = { '': 'Overview', script: 'Script', shots: 'Shots', storyboard: 'Boards', breakdown: 'Breakdown', cast: 'Cast', props: 'Props', equipment: 'Gear', schedule: 'Schedule', callsheets: 'Call sheets', team: 'Team', export: 'Settings' }
+
+/** Phone only: one row along the bottom that swipes sideways. The current section scrolls into view. */
 function SectionDock({ b, pid, pending }: { b: Bundle; pid: string; pending: number }) {
+  const ref = useRef<HTMLElement>(null)
+  const loc = useLocation()
+  useEffect(() => {
+    const cur = ref.current?.querySelector<HTMLElement>('a[aria-current="page"]')
+    const bar = ref.current
+    if (!cur || !bar) return
+    const left = cur.offsetLeft - (bar.clientWidth - cur.offsetWidth) / 2
+    bar.scrollTo({ left: Math.max(0, left), behavior: window.matchMedia('(prefers-reduced-motion: reduce)').matches ? 'auto' : 'smooth' })
+  }, [loc.pathname])
   return (
-    <nav className="lb-dock" aria-label="Project sections">
+    <nav className="lb-dock" aria-label="Project sections" ref={ref}>
       {SECTIONS.map((s) => {
         const st = navState(b, s)
         return (
           <NavLink key={s.path} to={`/p/${pid}${s.path ? '/' + s.path : ''}`} end={s.path === ''} title={s.label}
             className={st.locked ? 'is-locked' : undefined}>
             <Icon name={s.icon as never} />
+            <span className="lb-dock-name" aria-hidden="true">{DOCK_NAME[s.path] ?? s.label}</span>
             <span className="lb-sr">{s.label}{st.locked ? ', no access' : st.tag ? `, ${st.tag.toLowerCase()}` : ''}</span>
             {st.locked && <span className="lb-dock-lock" aria-hidden="true"><Icon name="lock" /></span>}
             {s.fixed === 'team' && pending > 0 && <span className="lb-dock-count"><span aria-hidden="true">{pending}</span><span className="lb-sr">, {pending} {pending === 1 ? 'request' : 'requests'} to join</span></span>}

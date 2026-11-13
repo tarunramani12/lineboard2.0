@@ -100,7 +100,7 @@ export default function CallSheetsPage() {
     </div>
   )
   if (st.locked) {
-    return (<>{head}<EmptyState title="Call sheets are not open to your team" action={levelFor(b, 'call_sheets') === 'edit' ? undefined : <Link className="lb-btn" to="../team">Open Team and access</Link>}>The owner can change this in Team and access.</EmptyState></>)
+    return (<>{head}<EmptyState title="Call sheets are not open to your team" action={levelFor(b, 'call_sheets') === 'edit' ? undefined : <Link className="lb-btn" to="../team">Open Team and access</Link>}>The admin can change this in Team and access.</EmptyState></>)
   }
   const nameOf = (uid: string | null) => b.people.find((p) => p.account_id === uid)?.name ?? ''
 
@@ -316,7 +316,6 @@ export default function CallSheetsPage() {
               </div>
             )}
             {diff.removed.cast.length > 0 && <p className="lb-caption">Removed: {diff.removed.cast.join(', ')}.</p>}
-            <p className="lb-caption"><Icon name="lock" /> Phone and email are not on the call sheet. The AD team finds them in Cast and crew.</p>
           </section>
 
           <section className="lb-card lb-stack" style={{ padding: 16 }} aria-label="Crew">

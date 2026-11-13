@@ -1,5 +1,6 @@
 import { useQuery } from '@tanstack/react-query'
 import { supabase } from './supabase'
+import { DEFAULT_ASPECT, stageSize } from './aspect'
 
 export const BUCKET = 'storyboard'
 export const MAX_LAYERS = 4
@@ -143,7 +144,7 @@ export function paintFrame(ctx: CanvasRenderingContext2D, W: number, H: number, 
     for (const s of strokes) {
       if (!s.points.length) continue
       target.globalCompositeOperation = s.erase ? 'destination-out' : 'source-over'
-      target.strokeStyle = s.erase ? '#000' : s.color; target.lineWidth = s.width * (W / STAGE_W)
+      target.strokeStyle = s.erase ? '#000' : s.color; target.lineWidth = s.width * (Math.max(W, H) / STAGE_W)
       target.beginPath()
       target.moveTo(s.points[0][0] * W, s.points[0][1] * H)
       if (s.points.length === 1) target.lineTo(s.points[0][0] * W + 0.1, s.points[0][1] * H)
@@ -156,10 +157,19 @@ export function paintFrame(ctx: CanvasRenderingContext2D, W: number, H: number, 
   ctx.restore()
 }
 
-export async function flatten(layers: DrawLayer[], strokes: Stroke[], quality = 0.82): Promise<Blob> {
-  const c = document.createElement('canvas'); c.width = STAGE_W; c.height = STAGE_H
-  paintFrame(c.getContext('2d')!, STAGE_W, STAGE_H, layers, strokes)
+export async function flatten(layers: DrawLayer[], strokes: Stroke[], ratio: string = DEFAULT_ASPECT, quality = 0.82): Promise<Blob> {
+  const { w, h } = stageSize(ratio)
+  const c = document.createElement('canvas'); c.width = w; c.height = h
+  paintFrame(c.getContext('2d')!, w, h, layers, strokes)
   return toBlob(c, quality)
+}
+
+/** Draw a finished picture inside a canvas without stretching it (a frame made at another ratio is centred). */
+export function drawContain(ctx: CanvasRenderingContext2D, im: CanvasImageSource & { naturalWidth?: number; naturalHeight?: number; width?: number | SVGAnimatedLength; height?: number | SVGAnimatedLength }, W: number, H: number) {
+  const iw = im.naturalWidth || Number(im.width) || W, ih = im.naturalHeight || Number(im.height) || H
+  const k = Math.min(W / iw, H / ih)
+  ctx.fillStyle = '#fff'; ctx.fillRect(0, 0, W, H)
+  ctx.drawImage(im, (W - iw * k) / 2, (H - ih * k) / 2, iw * k, ih * k)
 }
 
 /** Keep strokes small: three decimals, and drop points that sit almost on top of the last one. */

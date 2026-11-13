@@ -7,6 +7,7 @@ import Overview from './pages/Overview'
 import Script from './pages/Script'
 import ImportScript from './pages/ImportScript'
 import ShotList from './pages/ShotList'
+import Bible from './pages/Bible'
 import Breakdown from './pages/Breakdown'
 import CastCrew from './pages/CastCrew'
 import SchedulePage from './pages/Schedule'
@@ -38,6 +39,7 @@ export default function App() {
               <Route path="scenes" element={<Navigate to="../script" replace />} />
               <Route path="shots" element={<ShotList />} />
               <Route path="storyboard" element={<Storyboard />} />
+              <Route path="bible" element={<Bible />} />
               <Route path="breakdown" element={<Breakdown />} />
               <Route path="cast" element={<CastCrew />} />
               <Route path="schedule" element={<SchedulePage />} />

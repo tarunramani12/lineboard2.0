@@ -1,6 +1,6 @@
 import { useQuery } from '@tanstack/react-query'
 import { supabase } from './supabase'
-import { isOwnerOrAdmin, type Bundle } from './project'
+import { isOwnerOrAdmin, type Bundle, hasEditGrantFor } from './project'
 import type { Element } from './fountain'
 import type { Team } from './types'
 
@@ -54,7 +54,7 @@ export function useBreakdown(pid: string | undefined) {
 export function canEditBreakdownFor(b: Bundle, teamId: string): boolean {
   if (isOwnerOrAdmin(b)) return true
   return b.myLinks.some((l) => l.team_id === teamId && (l.is_hod || l.can_edit)
-    && b.access.find((a) => a.team_id === teamId && a.section === 'breakdown')?.level === 'edit')
+    && b.access.find((a) => a.team_id === teamId && a.section === 'breakdown')?.level === 'edit') || hasEditGrantFor(b, 'breakdown', teamId)
 }
 export const teamsIEditBreakdown = (b: Bundle): Team[] => b.teams.filter((t) => canEditBreakdownFor(b, t.id))
 

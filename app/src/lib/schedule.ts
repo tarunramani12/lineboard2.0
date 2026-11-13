@@ -4,7 +4,7 @@ import { levelFor, type Bundle } from './project'
 import type { CrewRow } from './castcrew'
 import { LINES_PER_PAGE } from './fountain'
 
-export interface Schedule { id: string; project_id: string; name: string; start_date: string; end_date: string; notes: string; created_at: string }
+export interface Schedule { id: string; project_id: string; name: string; start_date: string; end_date: string; notes: string; created_at: string; locked: boolean; locked_by: string | null; locked_at: string | null }
 export interface ShootDay { id: string; project_id: string; schedule_id: string; day_date: string; location: string; notes: string }
 export interface Placement { schedule_id: string; scene_id: string; project_id: string; day_id: string; sort_order: number }
 export interface ShotPlacement { schedule_id: string; shot_id: string; project_id: string; day_id: string; sort_order: number }

@@ -283,7 +283,7 @@ export function Projects() {
       </main>
       {creating && (
         <Dialog title="New project" onClose={() => setCreating(false)}>
-          <p>You become the owner. Ten department teams are created for you, and you choose what each can see.</p>
+          <p>You become the admin. Ten department teams are created for you, and you choose what each can see.</p>
           <form className="lb-stack" onSubmit={create}>
             <Field label="Project name" required autoFocus value={name} onChange={(e) => setName(e.target.value)} />
             {error && <p className="lb-error" role="alert">{error}</p>}

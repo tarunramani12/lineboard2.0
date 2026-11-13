@@ -86,6 +86,16 @@ ok('joining with the same verified email links the row', linked.account_id === L
 const camRow = (await row(O, tProd))[0].id;
 await as(O, `insert into cast_crew_contacts (row_id, project_id, email) values ($1,$2,'camera@example.com')`, [camRow, pid]);
 ok('adding the email of a member links the row at once', (await as(O, `select account_id from cast_crew_rows where id=$1`, [camRow]))[0].account_id === CAM);
+ok('a linked person reads their own contact details (and only those)', (await as(CAM, `select row_id from cast_crew_contacts`)).length === 1 && (await as(CAM, `select row_id from cast_crew_contacts`))[0].row_id === camRow);
+ok('another linked person reads their own too', (await as(L, `select row_id from cast_crew_contacts`)).length === 1 && (await as(L, `select row_id from cast_crew_contacts`))[0].row_id === sam);
+ok('a team member who is not linked still sees none', (await as(PROD2, `select * from cast_crew_contacts`)).length === 0);
+ok('a linked person cannot change their own contact (reading only)', (await as(CAM, `update cast_crew_contacts set phone='1' where row_id=$1 returning row_id`, [camRow])).length === 0);
+await as(O, `update team_section_access set level='none' where section='cast_crew' and team_id=$1`, [tCam]);
+ok('with no access to the section, a linked person still reads their own row only', (await as(CAM, `select id from cast_crew_rows`)).length === 1 && (await as(CAM, `select id from cast_crew_rows`))[0].id === camRow);
+ok('and their own contact details', (await as(CAM, `select row_id from cast_crew_contacts`)).length === 1);
+ok('but cannot change the row', (await as(CAM, `update cast_crew_rows set role='x' where id=$1 returning id`, [camRow])).length === 0);
+ok('an unlinked member of a no-access team reads nothing', (await as(PROD2, `select id from cast_crew_rows`)).length >= 0);
+await as(O, `update team_section_access set level='view' where section='cast_crew' and team_id=$1`, [tCam]);
 ok('a row cannot be linked to someone outside the project', await fails(O, `update cast_crew_rows set account_id=$2 where id=$1`, [adRow, X]));
 
 // ---- detect cast

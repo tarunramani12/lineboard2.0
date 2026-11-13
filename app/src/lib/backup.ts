@@ -3,6 +3,7 @@
 import { toFountainFile, type ExportScene } from './exportScript'
 import type { Element } from './fountain'
 import { BUCKET, framePaths, type Frame } from './storyboard'
+import { MOOD_BUCKET, type MoodItem } from './bible'
 import { supabase } from './supabase'
 
 export const BACKUP_VERSION = 1
@@ -25,12 +26,13 @@ export async function buildBackup(pid: string, projectName: string, progress: Ba
   const members = await rows('members', 'project_id', pid) as { id: string; account_id: string | null }[]
   const scenes = await rows('scenes', 'project_id', pid) as { id: string; number?: string; display_number: string | null; heading: string; status: string; revised_in: number | null; sort_order: number }[]
   const sceneIds = scenes.map((s) => s.id)
-  const [access, memberTeams, texts, shots, frames, profiles] = await Promise.all([
+  const [access, memberTeams, texts, shots, frames, profiles, bible, mood] = await Promise.all([
     rows('team_section_access', 'team_id', teamIds), rows('member_teams', 'team_id', teamIds), rows('scene_text', 'scene_id', sceneIds),
     rows('shots', 'project_id', pid), rows('storyboard_frames', 'project_id', pid),
     rows('profiles', 'id', members.map((m) => m.account_id).filter((x): x is string => Boolean(x))),
+    rows('project_bible', 'project_id', pid), rows('moodboard_items', 'project_id', pid),
   ])
-  const data = { app: 'LineBoard 2.0', version: BACKUP_VERSION, made_at: new Date().toISOString(), project, teams, team_section_access: access, members, member_teams: memberTeams, profiles, scenes, scene_text: texts, shots, storyboard_frames: frames }
+  const data = { app: 'LineBoard', version: BACKUP_VERSION, made_at: new Date().toISOString(), project, teams, team_section_access: access, members, member_teams: memberTeams, profiles, scenes, scene_text: texts, shots, storyboard_frames: frames, project_bible: bible, moodboard_items: mood }
 
   const byScene = new Map((texts as { scene_id: string; elements: Element[] }[]).map((t) => [t.scene_id, t.elements]))
   const script: ExportScene[] = [...scenes].sort((a, b) => a.sort_order - b.sort_order).map((s) => ({
@@ -40,7 +42,7 @@ export async function buildBackup(pid: string, projectName: string, progress: Ba
   const files: Record<string, Uint8Array> = {
     'backup.json': strToU8(JSON.stringify(data, null, 2)),
     'script.fountain': strToU8(toFountainFile(script)),
-    'README.txt': strToU8(`LineBoard 2.0 backup of "${projectName}", made ${new Date().toLocaleString()}.\nbackup.json holds every table. script.fountain is the script. storyboard/ holds the frame pictures, under the same paths the database refers to.\n`),
+    'README.txt': strToU8(`LineBoard backup of "${projectName}", made ${new Date().toLocaleString()}.\nbackup.json holds every table. script.fountain is the script. storyboard/ holds the frame pictures and moodboard/ the moodboard pictures, under the same paths the database refers to.\n`),
   }
   const paths = (frames as Frame[]).flatMap(framePaths)
   let pictures = 0
@@ -49,6 +51,13 @@ export async function buildBackup(pid: string, projectName: string, progress: Ba
     const { data: blob, error } = await supabase.storage.from(BUCKET).download(path)
     if (error || !blob) throw new Error(`A storyboard picture could not be downloaded (${path}).`)
     files['storyboard/' + path] = new Uint8Array(await blob.arrayBuffer()); pictures++
+  }
+  const moodPaths = (mood as MoodItem[]).flatMap((m) => (m.image_path ? [m.image_path] : []))
+  for (const [i, path] of moodPaths.entries()) {
+    progress(`Moodboard pictures ${i + 1} of ${moodPaths.length}`)
+    const { data: blob, error } = await supabase.storage.from(MOOD_BUCKET).download(path)
+    if (error || !blob) throw new Error(`A moodboard picture could not be downloaded (${path}).`)
+    files['moodboard/' + path] = new Uint8Array(await blob.arrayBuffer()); pictures++
   }
   progress('Packing the file')
   const zip = zipSync(files, { level: 0 })   // pictures are JPEGs already; skipping compression keeps it quick

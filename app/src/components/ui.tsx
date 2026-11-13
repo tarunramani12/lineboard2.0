@@ -20,6 +20,7 @@ const paths: Record<string, ReactNode> = {
   s_scenes: <><rect x="3" y="7" width="18" height="13" rx="2" /><path d="M3 11h18M7 7l-2-4M13 7l-2-4M19 7l-2-4" /></>,
   s_shots: <><rect x="3" y="7" width="13" height="11" rx="2" /><path d="M16 11l5-3v8l-5-3" /></>,
   s_storyboard: <><rect x="3" y="4" width="8" height="7" rx="1.5" /><rect x="13" y="4" width="8" height="7" rx="1.5" /><rect x="3" y="13" width="8" height="7" rx="1.5" /><path d="M13 16.5h8" /></>,
+  s_bible: <><path d="M6 4h11a2 2 0 0 1 2 2v14H8a2 2 0 0 1-2-2z" /><path d="M6 18a2 2 0 0 1 2-2h11M10 8h5" /></>,
   s_breakdown: <><path d="M4 7h3M4 12h3M4 17h3M10 7h10M10 12h10M10 17h10" /></>,
   s_cast: <><circle cx="9" cy="8" r="3" /><path d="M3 20a6 6 0 0 1 12 0" /><circle cx="17" cy="9" r="2.5" /><path d="M17 14.5a5 5 0 0 1 4 5.5" /></>,
   s_equipment: <><rect x="3" y="8" width="18" height="12" rx="2" /><path d="M9 8V6a2 2 0 0 1 2-2h2a2 2 0 0 1 2 2v2M3 14h18" /></>,
@@ -236,15 +237,13 @@ export function ListPicker({ id, value, onChange, options, disabled, noun, maxLe
   )
 }
 
-/** Says what you can do here and, when you cannot, who can. */
-export function Permission({ level, team, why, small }: { level: 'edit' | 'view' | 'locked'; team?: string; why?: string; small?: boolean }) {
-  const cls = 'lb-perm' + (level === 'locked' ? ' lb-perm--locked' : '') + (small ? ' lb-perm--sm' : '')
-  return (
-    <span className={cls}>
-      <Icon name={level === 'edit' ? 'pencil' : level === 'view' ? 'eye' : 'lock'} />
-      {level === 'edit' ? `You can edit${team ? ' · ' + team : ''}` : level === 'view' ? 'View only' : why || 'Locked'}
-    </span>
-  )
+/**
+ * The app no longer tells a person what kind of access they have (owner decision): a person who can only read simply finds
+ * there is nothing to change. Pages still place this where the badge used to be, and it draws nothing.
+ */
+// eslint-disable-next-line @typescript-eslint/no-unused-vars
+export function Permission(_props: { level: 'edit' | 'view' | 'locked'; team?: string; why?: string; small?: boolean }) {
+  return null
 }
 
 export function EmptyState({ title, children, action }: { title: string; children?: ReactNode; action?: ReactNode }) {

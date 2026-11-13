@@ -10,18 +10,21 @@ import { isOwnerOrAdmin, levelFor, useScenes } from '../lib/project'
 import { SECTIONS } from '../lib/sections'
 import { canEditShotsFor, shotLabel, useShots, type Shot } from '../lib/shots'
 import {
-  BUCKET, ImageProblem, MAX_LAYERS, MAX_STROKES, STAGE_H, STAGE_W, addPoint, compressImage, flatten, framePaths, gridCells,
+  BUCKET, ImageProblem, MAX_LAYERS, MAX_STROKES, addPoint, drawContain, compressImage, flatten, framePaths, gridCells,
   loadImage, mb, paintFrame, removeFiles, totalBytes, uploadImage, useFrames, useSignedUrls,
   toDraw, type DrawLayer, type Frame, type Layer, type Stroke,
 } from '../lib/storyboard'
 import { supabase } from '../lib/supabase'
+import { cssRatio, ratioValue, stageSize } from '../lib/aspect'
 import type { Scene } from '../lib/types'
 
 const COLORS = ['#111111', '#d11a1a', '#1f5fd1']
 const WIDTHS = [3, 6, 12]
 
 /** A small picture of a frame: the flattened image when it is done, otherwise the layers and drawing painted on the spot. */
-function FrameThumb({ frame, urls, offline }: { frame: Frame | undefined; urls: Map<string, string> | undefined; offline: boolean }) {
+function FrameThumb({ frame, urls, offline, ratio }: { frame: Frame | undefined; urls: Map<string, string> | undefined; offline: boolean; ratio: string }) {
+  const rs = { aspectRatio: cssRatio(ratio) }
+  const sz = stageSize(ratio); const tw = 480, th = Math.max(1, Math.round(tw * sz.h / sz.w))
   const ref = useRef<HTMLCanvasElement>(null)
   const [failed, setFailed] = useState(false)
   const flatUrl = frame?.done && frame.flat_path ? urls?.get(frame.flat_path) : undefined
@@ -38,19 +41,20 @@ function FrameThumb({ frame, urls, offline }: { frame: Frame | undefined; urls: 
     })).then((ls) => { if (live) paintFrame(ctx, c.width, c.height, ls, frame.strokes) }).catch(() => { if (live) setFailed(true) })
     return () => { live = false }
   }, [frame, urls])
-  if (!frame) return <div className="lb-frame lb-frame--empty"><span className="lb-caption">No frame yet</span></div>
-  if (offline || failed) return <div className="lb-frame lb-frame--empty"><Icon name="cloudoff" /><span className="lb-caption">{offline ? 'Offline. Frames are blank.' : 'The picture did not load.'}</span></div>
-  if (frame.done) return flatUrl ? <img className="lb-frame" src={flatUrl} alt="Finished frame" loading="lazy" /> : <div className="lb-frame lb-frame--empty"><span className="lb-caption">Loading</span></div>
-  return <canvas ref={ref} className="lb-frame" width={480} height={270} aria-label="Frame sketch" />
+  if (!frame) return <div className="lb-frame lb-frame--empty" style={rs}><span className="lb-caption">No frame yet</span></div>
+  if (offline || failed) return <div className="lb-frame lb-frame--empty" style={rs}><Icon name="cloudoff" /><span className="lb-caption">{offline ? 'Offline. Frames are blank.' : 'The picture did not load.'}</span></div>
+  if (frame.done) return flatUrl ? <img className="lb-frame" style={rs} src={flatUrl} alt="Finished frame" loading="lazy" /> : <div className="lb-frame lb-frame--empty" style={rs}><span className="lb-caption">Loading</span></div>
+  return <canvas ref={ref} className="lb-frame" style={rs} width={tw} height={th} aria-label="Frame sketch" />
 }
 
 interface EditorProps {
   shot: Shot; label: string; scene: Scene; frame: Frame | undefined; canEdit: boolean
   urls: Map<string, string> | undefined; usedByOthers: number; capBytes: number
-  pid: string; onClose: () => void; onSaved: () => void
+  pid: string; ratio: string; onClose: () => void; onSaved: () => void
 }
 
-function FrameEditor({ shot, label, scene, frame, canEdit, urls, usedByOthers, capBytes, pid, onClose, onSaved }: EditorProps) {
+function FrameEditor({ shot, label, scene, frame, canEdit, urls, usedByOthers, capBytes, pid, ratio, onClose, onSaved }: EditorProps) {
+  const stage = stageSize(ratio)
   const [layers, setLayers] = useState<Layer[]>(frame?.layers ?? [])
   const [strokes, setStrokes] = useState<Stroke[]>(frame?.strokes ?? [])
   const [color, setColor] = useState(COLORS[0])
@@ -111,7 +115,7 @@ function FrameEditor({ shot, label, scene, frame, canEdit, urls, usedByOthers, c
     setWorking('Compressing the picture')
     try {
       const { blob, w, h } = await compressImage(file)
-      if (usedByOthers + bytes + blob.size > capBytes) throw new ImageProblem(`This project has reached its storyboard size limit of ${mb(capBytes)} MB. Delete a frame, or ask the owner to raise the limit.`)
+      if (usedByOthers + bytes + blob.size > capBytes) throw new ImageProblem(`This project has reached its storyboard size limit of ${mb(capBytes)} MB. Delete a frame, or ask the admin to raise the limit.`)
       setWorking('Uploading')
       const path = await uploadImage(pid, shot.id, blob)
       uploaded.current.push(path)
@@ -173,7 +177,7 @@ function FrameEditor({ shot, label, scene, frame, canEdit, urls, usedByOthers, c
       if (e) throw e
     }
   }
-  const fail = (e: unknown) => setError(/image_cap_reached/.test(String((e as { message?: string })?.message)) ? `This project has reached its storyboard size limit of ${mb(capBytes)} MB. Delete a frame, or ask the owner to raise the limit.` : friendlyError(e))
+  const fail = (e: unknown) => setError(/image_cap_reached/.test(String((e as { message?: string })?.message)) ? `This project has reached its storyboard size limit of ${mb(capBytes)} MB. Delete a frame, or ask the admin to raise the limit.` : friendlyError(e))
 
   async function save() {
     setBusy(true); setError(null)
@@ -191,7 +195,7 @@ function FrameEditor({ shot, label, scene, frame, canEdit, urls, usedByOthers, c
     let flatPath: string | null = null
     try {
       const ls: DrawLayer[] = layers.flatMap((l) => { const d = imgs.get(l.path); return d ? [{ ...d, opacity: l.opacity, visible: l.visible, x: l.x, y: l.y, scale: l.scale, rot: l.rot }] : [] })
-      const blob = await flatten(ls, strokes)
+      const blob = await flatten(ls, strokes, ratio)
       if (usedByOthers + blob.size > capBytes) throw new ImageProblem(`This project has reached its storyboard size limit of ${mb(capBytes)} MB.`)
       flatPath = await uploadImage(pid, shot.id, blob)
       await writeRow({ layers: [], strokes: [], flat_path: flatPath, done: true, bytes: blob.size })
@@ -208,7 +212,9 @@ function FrameEditor({ shot, label, scene, frame, canEdit, urls, usedByOthers, c
     if (!frame?.flat_path) return
     setBusy(true); setError(null)
     try {
-      await writeRow({ layers: [{ path: frame.flat_path, w: STAGE_W, h: STAGE_H, bytes: frame.bytes, opacity: 1, visible: true }], strokes: [], flat_path: null, done: false })
+      let fw = stage.w, fh = stage.h
+      try { const im = await loadImage(urls?.get(frame.flat_path) ?? ''); fw = im.naturalWidth || fw; fh = im.naturalHeight || fh } catch { /* keep the stage size */ }
+      await writeRow({ layers: [{ path: frame.flat_path, w: fw, h: fh, bytes: frame.bytes, opacity: 1, visible: true }], strokes: [], flat_path: null, done: false })
       saved.current = true
       onSaved(); onClose()
     } catch (e) { fail(e) } finally { setBusy(false) }
@@ -236,10 +242,10 @@ function FrameEditor({ shot, label, scene, frame, canEdit, urls, usedByOthers, c
         <p className="lb-caption">{scene.heading || 'No heading yet'} · {shot.description || 'No description'}</p>
 
         {isDone ? (
-          flatUrl ? <img className="lb-stage" src={flatUrl} alt="Finished frame" /> : <div className="lb-stage lb-stage--empty">Loading</div>
+          flatUrl ? <img className="lb-stage" style={{ aspectRatio: cssRatio(ratio), objectFit: 'contain' }} src={flatUrl} alt="Finished frame" /> : <div className="lb-stage lb-stage--empty" style={{ aspectRatio: cssRatio(ratio) }}>Loading</div>
         ) : (
-          <canvas ref={canvas} className="lb-stage" width={STAGE_W} height={STAGE_H} role="img" aria-label="Frame stage. Draw here with a finger, a pen or the mouse."
-            onPointerDown={down} onPointerMove={move} onPointerUp={up} onPointerCancel={up} style={{ cursor: !canEdit ? 'default' : tool === 'move' ? 'move' : 'crosshair', touchAction: 'none' }} />
+          <canvas ref={canvas} className="lb-stage" width={stage.w} height={stage.h} role="img" aria-label="Frame stage. Draw here with a finger, a pen or the mouse."
+            onPointerDown={down} onPointerMove={move} onPointerUp={up} onPointerCancel={up} style={{ aspectRatio: cssRatio(ratio), cursor: !canEdit ? 'default' : tool === 'move' ? 'move' : 'crosshair', touchAction: 'none' }} />
         )}
 
         {canEdit && !isDone && (
@@ -282,7 +288,6 @@ function FrameEditor({ shot, label, scene, frame, canEdit, urls, usedByOthers, c
             </div>
           </>
         )}
-        {!canEdit && <p className="lb-caption"><Icon name="lock" /> Only the team that owns this shot can change its frame.</p>}
         <p className="lb-caption">This project uses {mb(used)} MB of {mb(capBytes)} MB for storyboard pictures. Marking a frame done flattens it into one picture and frees the space the layers used.</p>
         {error && <p className="lb-error" role="alert">{error}</p>}
         <div className="lb-actions" style={{ justifyContent: 'space-between' }}>
@@ -319,6 +324,7 @@ export default function Storyboard() {
   const [exporting, setExporting] = useState(false)
 
   const capMb = b.project.image_cap_mb ?? 200
+  const ratio = b.project.aspect_ratio ?? '16:9'
   const used = totalBytes(frames.values())
   const pct = Math.min(100, (used / (capMb * 1048576)) * 100)
   const refresh = () => { void qc.invalidateQueries({ queryKey: ['frames', pid] }); void qc.invalidateQueries({ queryKey: ['signed'] }) }
@@ -344,6 +350,7 @@ export default function Storyboard() {
       const { jsPDF } = await import('jspdf')
       const doc = new jsPDF({ unit: 'pt', format: 'a4', orientation: 'landscape' })
       const cells = gridCells(842, 595, 36, 3, 2, 14)
+      const pdfSz = stageSize(ratio); const pdfW = Math.round(pdfSz.w * 0.75), pdfH = Math.round(pdfSz.h * 0.75)
       const all = scenes.flatMap((sc, si) => (bySceneId.get(sc.id) ?? []).map((s, i) => ({ sc, si, s, n: i + 1 })))
       const u = new Map<string, string>()
       if (paths.length) {
@@ -360,11 +367,11 @@ export default function Storyboard() {
         if (f) {
           try {
             const ls: DrawLayer[] = f.done ? [] : await Promise.all(f.layers.map(async (l) => { const im = await loadImage(u.get(l.path) ?? ''); return toDraw(l, im, im.naturalWidth, im.naturalHeight) }))
-            const c = document.createElement('canvas'); c.width = 960; c.height = 540
+            const c = document.createElement('canvas'); c.width = pdfW; c.height = pdfH
             const ctx = c.getContext('2d')!
-            if (f.done && f.flat_path) { const im = await loadImage(u.get(f.flat_path) ?? ''); ctx.drawImage(im, 0, 0, 960, 540) } else paintFrame(ctx, 960, 540, ls, f.strokes)
-            const ratio = 16 / 9
-            const w = Math.min(cell.w, imgH * ratio), h = w / ratio
+            if (f.done && f.flat_path) { const im = await loadImage(u.get(f.flat_path) ?? ''); drawContain(ctx, im, pdfW, pdfH) } else paintFrame(ctx, pdfW, pdfH, ls, f.strokes)
+            const rv = ratioValue(ratio)
+            const w = Math.min(cell.w, imgH * rv), h = w / rv
             doc.addImage(c.toDataURL('image/jpeg', 0.8), 'JPEG', cell.x + (cell.w - w) / 2, cell.y + (imgH - h) / 2, w, h)
           } catch { doc.setFontSize(9); doc.text('Picture not available', cell.x + 8, cell.y + 16) }
         } else { doc.setFontSize(9); doc.setTextColor(140); doc.text('No frame', cell.x + 8, cell.y + 16); doc.setTextColor(0) }
@@ -390,7 +397,7 @@ export default function Storyboard() {
       <>
         {head}
         <EmptyState title="The storyboard is not open to your team" action={isOwnerOrAdmin(b) ? <Link className="lb-btn" to="../team">Open Team and access</Link> : undefined}>
-          The owner can change this in Team and access.
+          The admin can change this in Team and access.
         </EmptyState>
       </>
     )
@@ -442,12 +449,12 @@ export default function Storyboard() {
                   const editable = canEditShotsFor(b, s.team_id)
                   return (
                     <button key={s.id} className="lb-card-btn" onClick={() => setOpen(s.id)} aria-label={`Open the frame for shot ${shotLabel(sc, si, i + 1)}`}>
-                      <FrameThumb frame={f} urls={urls} offline={!online} />
+                      <FrameThumb frame={f} urls={urls} offline={!online} ratio={ratio} />
                       <span className="lb-card-cap">
                         <span className="lb-body-strong">{shotLabel(sc, si, i + 1)}</span>
                         <span className="lb-card-desc">{s.description || 'No description'}</span>
                         <span className="lb-caption">
-                          {f?.done ? <><Icon name="check" /> Done</> : f ? 'Sketch' : editable ? 'Add a frame' : <><Icon name="lock" /> No frame</>}
+                          {f?.done ? <><Icon name="check" /> Done</> : f ? 'Sketch' : editable ? 'Add a frame' : <span className="lb-rolock"><Icon name="lock" /><span className="lb-sr">No frame</span></span>}
                         </span>
                       </span>
                     </button>
@@ -465,7 +472,7 @@ export default function Storyboard() {
           shot={openShot} scene={openScene}
           label={shotLabel(openScene, scenes.findIndex((s) => s.id === openScene.id), (bySceneId.get(openScene.id) ?? []).findIndex((s) => s.id === openShot.id) + 1)}
           frame={frames.get(openShot.id)} canEdit={canEditShotsFor(b, openShot.team_id)} urls={urls}
-          usedByOthers={used - (frames.get(openShot.id)?.bytes ?? 0)} capBytes={capMb * 1048576} pid={pid}
+          usedByOthers={used - (frames.get(openShot.id)?.bytes ?? 0)} capBytes={capMb * 1048576} pid={pid} ratio={ratio}
           onClose={() => setOpen(null)} onSaved={refresh}
         />
       )}

@@ -138,7 +138,7 @@ export default function ImportScript() {
   const head = (
     <div className="lb-page-head">
       <h1 className="lb-title">{hasExisting ? 'Import a script or a new draft' : 'Import a script'}</h1>
-      <Permission level={owner ? 'edit' : 'locked'} why="Owner only" />
+      <Permission level={owner ? 'edit' : 'locked'} why="Admin only" />
     </div>
   )
 
@@ -146,8 +146,8 @@ export default function ImportScript() {
     return (
       <>
         {head}
-        <EmptyState title="Only the owner can import a script" action={<Link to={`/p/${pid}/script`} className="lb-btn">Back to the script</Link>}>
-          The owner reads the file, checks the scenes found, and confirms.
+        <EmptyState title="Only the admin can import a script" action={<Link to={`/p/${pid}/script`} className="lb-btn">Back to the script</Link>}>
+          The admin reads the file, checks the scenes found, and confirms.
         </EmptyState>
       </>
     )
@@ -188,7 +188,7 @@ export default function ImportScript() {
     )
   }
 
-  // ---- step 3: match the new draft to the scenes already here, and let the owner approve
+  // ---- step 3: match the new draft to the scenes already here, and let the admin approve
   if (stage === 'match' && planned) {
     const s = planned.summary
     const incl = scenes.filter((x) => x.include)

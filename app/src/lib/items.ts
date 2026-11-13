@@ -1,6 +1,6 @@
 import { useQuery } from '@tanstack/react-query'
 import { supabase } from './supabase'
-import { isOwnerOrAdmin, type Bundle } from './project'
+import { isOwnerOrAdmin, type Bundle, hasEditGrantFor } from './project'
 import type { BItem } from './breakdown'
 import type { SectionKey, Team } from './types'
 
@@ -57,7 +57,7 @@ export function useItems(pid: string | undefined, kind: ItemKind, withCosts: boo
 export function canEditItemFor(b: Bundle, kind: ItemKind, teamId: string): boolean {
   if (isOwnerOrAdmin(b)) return true
   const sec = KINDS[kind].section
-  return b.myLinks.some((l) => l.team_id === teamId && (l.is_hod || l.can_edit) && b.access.find((a) => a.team_id === teamId && a.section === sec)?.level === 'edit')
+  return b.myLinks.some((l) => l.team_id === teamId && (l.is_hod || l.can_edit) && b.access.find((a) => a.team_id === teamId && a.section === sec)?.level === 'edit') || hasEditGrantFor(b, sec, teamId)
 }
 export const teamsIEditItems = (b: Bundle, kind: ItemKind): Team[] => b.teams.filter((t) => canEditItemFor(b, kind, t.id))
 /** Cost is for the owner, admins and the Production team. */

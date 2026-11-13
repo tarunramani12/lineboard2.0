@@ -40,7 +40,6 @@ function RowDialog({ row, contact, rows, onClose, onSaved }: DialogProps) {
   const [error, setError] = useState<string | null>(null)
   const [confirmDelete, setConfirmDelete] = useState(false)
   const members = b.people.filter((p) => p.account_id && !p.former)
-  const teamName = (id: string) => b.teams.find((t) => t.id === id)?.name ?? 'No team'
   const roles = useMemo(() => [...CREW_ROLES, ...new Set(rows.filter((r) => r.kind === 'crew' && r.role && !CREW_ROLES.includes(r.role)).map((r) => r.role))], [rows])
   const former = row ? isFormer(row) : false
   const depts = useMemo(() => departmentOptions(b.teams.map((t) => t.name), rows), [b.teams, rows])
@@ -110,8 +109,6 @@ function RowDialog({ row, contact, rows, onClose, onSaved }: DialogProps) {
             {former && <Badge kind="omitted">Former member</Badge>}
           </span>
         </div>
-        {row && !editable && <p className="lb-caption"><Icon name="lock" /> Read only. This row is managed by {teamName(row.team_id)}.</p>}
-        {!row && mine.length === 0 && <p className="lb-caption"><Icon name="lock" /> Only teams with edit access to Cast and crew can add people.</p>}
 
         <div className="lb-field">
           <span className="lb-label">Kind</span>
@@ -141,7 +138,12 @@ function RowDialog({ row, contact, rows, onClose, onSaved }: DialogProps) {
             {field('cc-phone', 'Phone', <input id="cc-phone" type="tel" className="lb-input" value={phone} maxLength={40} disabled={dis} onChange={(e) => setPhone(e.target.value)} />)}
             {field('cc-email', 'Email', <input id="cc-email" type="email" className="lb-input" value={email} maxLength={200} disabled={dis} onChange={(e) => setEmail(e.target.value)} />, 'The call sheet is sent to this address.')}
           </div>
-        ) : <p className="lb-caption"><Icon name="lock" /> Phone and email are visible only to the owner, admins and the AD team.</p>}
+        ) : contact && (contact.phone || contact.email) ? (
+          <div className="lb-shotgrid">
+            {field('cc-phone', 'Phone', <input id="cc-phone" type="tel" className="lb-input" value={contact.phone ?? ''} disabled readOnly />)}
+            {field('cc-email', 'Email', <input id="cc-email" type="email" className="lb-input" value={contact.email ?? ''} disabled readOnly />, 'Only you and the production team see these.')}
+          </div>
+        ) : null}
         {field('cc-notes', 'Notes', <textarea id="cc-notes" className="lb-input lb-textarea" rows={2} value={notes} maxLength={500} disabled={dis} onChange={(e) => setNotes(e.target.value)} />)}
         {(() => {
           const teamChoices = row && !mine.some((t) => t.id === row.team_id) ? [b.teams.find((t) => t.id === row.team_id)!, ...mine] : mine
@@ -152,9 +154,8 @@ function RowDialog({ row, contact, rows, onClose, onSaved }: DialogProps) {
               <select id="cc-team" className="lb-input" value={teamId} onChange={(e) => setTeamId(e.target.value)}>
                 {teamChoices.map((t) => <option key={t.id} value={t.id}>{t.name}</option>)}
               </select>
-              <span className="lb-caption">Only this team edits the row. Only the owner or an admin can change it.</span>
             </div>
-          ) : <p className="lb-caption">Managed by {teamName(teamId)}. Only this team edits the row.</p>
+          ) : null
         })()}
         {row && <p className="lb-caption">Last edited {new Date(row.updated_at).toLocaleString()}.</p>}
         {error && <p className="lb-error" role="alert">{error}</p>}
@@ -176,7 +177,7 @@ export default function CastCrew() {
   const { b, pid } = useOutletContext<Ctx>()
   const qc = useQueryClient()
   const seeContacts = canSeeContacts(b)
-  const q = useCastCrew(pid, seeContacts)
+  const q = useCastCrew(pid, true)   // the database returns every contact to those who may see them, and a person's own contact to them
   const rows = useMemo(() => q.data?.rows ?? [], [q.data])
   const contacts = q.data?.contacts ?? new Map<string, CrewContact>()
   const def = SECTIONS.find((s) => s.path === 'cast')!
@@ -200,7 +201,7 @@ export default function CastCrew() {
     return (
       <>
         {head}
-        <EmptyState title="Cast and crew is not open to your team" action={isOwnerOrAdmin(b) ? <Link className="lb-btn" to="../team">Open Team and access</Link> : undefined}>The owner can change this in Team and access.</EmptyState>
+        <EmptyState title="Cast and crew is not open to your team" action={isOwnerOrAdmin(b) ? <Link className="lb-btn" to="../team">Open Team and access</Link> : undefined}>The admin can change this in Team and access.</EmptyState>
       </>
     )
   }
@@ -213,7 +214,7 @@ export default function CastCrew() {
     setError(null); setNote(null)
     const { data, error: e } = await supabase.rpc('detect_cast', { pid, for_team: team.id })
     if (e) { setError(errText(e)); return }
-    setNote(data ? `${data} ${data === 1 ? 'character' : 'characters'} added from the script. They are managed by ${team.name}. The owner or an admin can change that on each row.` : 'Every speaking character is already on the list.')
+    setNote(data ? `${data} ${data === 1 ? 'character' : 'characters'} added from the script. They are managed by ${team.name}. An admin can change that on each row.` : 'Every speaking character is already on the list.')
     refresh()
   }
 
@@ -223,7 +224,7 @@ export default function CastCrew() {
   return (
     <>
       {head}
-      <p className="lb-caption">One list for the whole project. Names, roles and call times are visible to everyone who can see this page. Phone and email are visible only to the owner, admins and the AD team. Each row is managed by one team, and only that team edits it.</p>
+      <p className="lb-caption">One list for the whole project. Names, roles and call times are visible to everyone who can see this page. Phone and email are visible only to the admins and the AD team. Each row is managed by one team, and only that team edits it.</p>
       <div className="lb-row">
         <div className="lb-seg" role="group" aria-label="Show">
           {([['all', `All ${rows.length}`], ['cast', `Cast ${counts.cast}`], ['crew', `Crew ${counts.crew}`]] as const).map(([k, l]) => (
@@ -250,27 +251,25 @@ export default function CastCrew() {
       {rows.length === 0 && !q.isLoading && <EmptyState title="Nobody on the list yet">Add people one at a time, or detect the cast from the speaking characters in the script.</EmptyState>}
       {rows.length > 0 && (
         <div className="lb-sheet">
-          <div className="lb-thead lb-ccrow lb-cchead"><span>Name</span><span>Role</span><span>Department</span><span>Call</span><span>Make-up</span><span>Contact</span></div>
+          <div className={'lb-thead lb-ccrow lb-cchead' + (seeContacts ? '' : ' lb-ccrow--nocontact')}><span>Name</span><span>Role</span><span>Department</span><span>Call</span><span>Make-up</span>{seeContacts && <span>Contact</span>}<span className="lb-cclock" /></div>
           {shown.map((r) => {
             const editable = canEditCrewFor(b, r.team_id)
             const c = contacts.get(r.id)
             return (
               <SwipeRow key={r.id} label={displayName(r) || r.role || 'this row'} canDelete={editable} confirmText="The person is removed from the Cast and crew list. This cannot be undone."
                 onDelete={async () => { const { data, error: e } = await supabase.from('cast_crew_rows').delete().eq('id', r.id).select('id'); if (e) throw new Error(errText(e)); if (!data?.length) throw new Error('You do not have permission to do that.'); refresh() }}>
-              <div className="lb-ccrow lb-ccitem is-click" {...rowOpen(() => setOpen({ id: r.id }))}>
+              <div className={'lb-ccrow lb-ccitem is-click' + (seeContacts ? '' : ' lb-ccrow--nocontact')} {...rowOpen(() => setOpen({ id: r.id }))}>
                 <button className="lb-shotdesc" onClick={() => setOpen({ id: r.id })} aria-label={`Open ${displayName(r) || r.role}`}>
                   {isFormer(r) ? <span className="lb-muted">Former member</span> : r.name || <span className="lb-muted">{r.kind === 'cast' ? 'Not cast yet' : 'No name'}</span>}
                   {r.auto && <Badge kind="plain">Script</Badge>}
                   {r.account_id && <Badge kind="plain">Account</Badge>}
-                  {!editable && <Badge kind="plain"><Icon name="lock" /> Read only</Badge>}
                 </button>
                 <span className="lb-shotcell">{r.kind === 'cast' ? <><span className="lb-muted">as </span>{r.role}</> : r.role || <span className="lb-muted">–</span>}</span>
                 <span className="lb-shotcell">{r.kind === 'cast' ? <span className="lb-muted">Cast</span> : r.department || <span className="lb-muted">–</span>}</span>
                 <span className="lb-shotcell">{r.call_time || <span className="lb-muted">–</span>}</span>
                 <span className="lb-shotcell">{r.makeup_time || <span className="lb-muted">–</span>}</span>
-                <span className="lb-shotcell">
-                  {seeContacts ? (c && (c.phone || c.email) ? <>{c.phone}{c.phone && c.email ? ' · ' : ''}{c.email}</> : <span className="lb-muted">–</span>) : <span className="lb-muted" title="Only the owner, admins and the AD team see contact details"><Icon name="lock" /> Hidden</span>}
-                </span>
+                {seeContacts && <span className="lb-shotcell">{c && (c.phone || c.email) ? <>{c.phone}{c.phone && c.email ? ' · ' : ''}{c.email}</> : <span className="lb-muted">–</span>}</span>}
+                <span className="lb-cclock">{!editable && <span className="lb-rolock" title="Managed by another team"><Icon name="lock" /><span className="lb-sr">Read only</span></span>}</span>
               </div>
               </SwipeRow>
             )

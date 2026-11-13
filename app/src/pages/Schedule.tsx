@@ -2,7 +2,7 @@ import { useEffect, useMemo, useState } from 'react'
 import { Link, useOutletContext } from 'react-router-dom'
 import { useQueryClient } from '@tanstack/react-query'
 import { navState, type Ctx } from '../components/ProjectLayout'
-import { Badge, Banner, Choice, EmptyState, Icon, Permission, SceneChip } from '../components/ui'
+import { Badge, Banner, Choice, Dialog as TitleDialog, EmptyState, Icon, Permission, SceneChip, useAction } from '../components/ui'
 import { useBreakdown } from '../lib/breakdown'
 import { canEditCrewFor, displayName, useCastCrew, type CrewRow } from '../lib/castcrew'
 import { estimateLines } from '../lib/fountain'
@@ -163,13 +163,39 @@ function UnavailableDialog({ pid, cast, onClose, onSaved, canEditRow }: { pid: s
 
 const castLabel = (r: CrewRow) => (displayName(r) && r.role ? `${r.role} (${displayName(r)})` : r.role || displayName(r) || 'Unnamed')
 
+/** Lock or unlock a schedule. Locked means finished and shared with everyone who can open the Schedule; nothing in it changes until it is unlocked. */
+function LockDialog({ sched, onClose, onDone }: { sched: Schedule; onClose: () => void; onDone: () => void }) {
+  const act = useAction()
+  async function go() {
+    const ok = await act.run(async () => {
+      const { data, error } = await supabase.from('schedules').update({ locked: !sched.locked }).eq('id', sched.id).select('id')
+      if (error) throw error
+      if (!data?.length) throw new Error('You do not have permission to do that.')
+      return true
+    }, (e) => (e instanceof Error && !('code' in e) ? e.message : friendlyError(e)))
+    if (ok) { onDone(); onClose() }
+  }
+  return (
+    <TitleDialog title={sched.locked ? 'Unlock this schedule?' : 'Lock this schedule?'} onClose={onClose} badge={<Badge kind={sched.locked ? 'conflict' : 'locked'}>{sched.locked ? 'Becomes a draft' : 'Shared and frozen'}</Badge>}>
+      {sched.locked
+        ? <p>The schedule becomes a draft again. People who only see locked schedules stop seeing it until it is locked again, and the production team can change it.</p>
+        : <p>Everyone who can open the Schedule will see it, including the cast and crew. Nobody can change it, and it cannot be deleted, until it is unlocked.</p>}
+      {act.error && <p className="lb-error" role="alert">{act.error}</p>}
+      <div className="lb-actions">
+        <button className="lb-btn" onClick={onClose}>Cancel</button>
+        <button className={'lb-btn ' + (sched.locked ? 'lb-btn--danger' : 'lb-btn--primary')} disabled={act.busy} onClick={go}>{sched.locked ? 'Unlock schedule' : 'Lock schedule'}</button>
+      </div>
+    </TitleDialog>
+  )
+}
+
 export default function SchedulePage() {
   const { b, pid } = useOutletContext<Ctx>()
   const qc = useQueryClient()
   const def = SECTIONS.find((s) => s.path === 'schedule')!
   const st = navState(b, def)
   const level = levelFor(b, 'schedule')
-  const editor = canEditSchedule(b)
+  const canEditAny = canEditSchedule(b)   // may edit the Schedule section; a locked schedule is still not editable by anyone
   const data = useScheduleData(pid)
   const scenesQ = useScenes(pid)
   const bd = useBreakdown(pid)
@@ -179,7 +205,9 @@ export default function SchedulePage() {
   const schedules = useMemo(() => data.data?.schedules ?? [], [data.data])
   const [chosen, setChosen] = useState<string>(() => { try { return localStorage.getItem(LAST_KEY + pid) ?? '' } catch { return '' } })
   const sched = schedules.find((s) => s.id === chosen) ?? schedules[0]
-  const [dialog, setDialog] = useState<'new' | 'edit' | 'unavailable' | null>(null)
+  const locked = Boolean(sched?.locked)
+  const editor = canEditAny && !locked
+  const [dialog, setDialog] = useState<'new' | 'edit' | 'unavailable' | 'lock' | null>(null)
   const [error, setError] = useState<string | null>(null)
   const [newDate, setNewDate] = useState('')
   const [drag, setDrag] = useState<{ id: string; day: string | null; before: string | null } | null>(null)
@@ -238,7 +266,7 @@ export default function SchedulePage() {
     return (
       <>
         {head}
-        <EmptyState title="Schedule is not open to your team" action={levelFor(b, 'schedule') === 'edit' ? undefined : <Link className="lb-btn" to="../team">Open Team and access</Link>}>The owner can change this in Team and access.</EmptyState>
+        <EmptyState title="Schedule is not open to your team" action={levelFor(b, 'schedule') === 'edit' ? undefined : <Link className="lb-btn" to="../team">Open Team and access</Link>}>The admin can change this in Team and access.</EmptyState>
       </>
     )
   }
@@ -408,7 +436,7 @@ export default function SchedulePage() {
   return (
     <>
       {head}
-      <p className="lb-caption">A schedule is a block of shoot days. A shoot day is made for every date in the schedule. Put each scene on the day it will be shot. Open a scene's shots to send some of them to a different day. Delete the days you will not shoot. Production and the AD team edit it by default. The owner can change that in Team and access.</p>
+      <p className="lb-caption">A schedule is a block of shoot days. A shoot day is made for every date in the schedule. Put each scene on the day it will be shot. Open a scene's shots to send some of them to a different day. Delete the days you will not shoot. Production and the AD team edit it by default. The admin can change that in Team and access.</p>
       {error && <p className="lb-error" role="alert">{error}</p>}
       <div className="lb-row">
         {schedules.length > 1 && (
@@ -421,12 +449,14 @@ export default function SchedulePage() {
           <ReportButton label="Download schedule PDF" file={`${fileSafe(b.project.name)}-schedule-${fileSafe(sched.name)}`}
             build={(size) => buildReportPdf(scheduleReport({ project: b.project.name, size, schedule: sched, days, placements, shotPlacements: shotPl, shots: allShots, scenes: scenesQ.data ?? [], castOf: (s) => sceneInfo(s).names, pagesOf: (s) => { const p = sceneInfo(s).pages; return p ? eighthsLabel(p) : '' } }))} />
         )}
+        {sched && (locked ? <Badge kind="locked">Locked</Badge> : canEditAny ? <Badge kind="plain">Draft</Badge> : null)}
         {editor && sched && <button className="lb-btn" onClick={() => setDialog('edit')}><Icon name="pencil" /> Edit schedule</button>}
-        {editor && <button className="lb-btn lb-btn--primary" onClick={() => setDialog('new')}><Icon name="plus" /> New schedule</button>}
+        {canEditAny && sched && <button className="lb-btn" onClick={() => setDialog('lock')}><Icon name="lock" /> {locked ? 'Unlock schedule' : 'Lock schedule'}</button>}
+        {canEditAny && <button className="lb-btn lb-btn--primary" onClick={() => setDialog('new')}><Icon name="plus" /> New schedule</button>}
       </div>
 
       {data.isLoading && <p className="lb-caption" role="status">Loading the schedule…</p>}
-      {!data.isLoading && !sched && <EmptyState title="No schedule yet">{editor ? 'Create a schedule for a block of shoot days. A film with one shoot has one schedule.' : 'Production or the AD team creates the schedule.'}</EmptyState>}
+      {!data.isLoading && !sched && <EmptyState title="No schedule yet">{canEditAny ? 'Create a schedule for a block of shoot days. A film with one shoot has one schedule.' : 'The production team shares the schedule here once it is locked.'}</EmptyState>}
 
       {sched && (
         <>
@@ -501,14 +531,14 @@ export default function SchedulePage() {
 
           <section className="lb-card lb-stack" style={{ padding: 16 }}>
             <div className="lb-spread"><h2 className="lb-heading" style={{ margin: 0 }}>Cast availability</h2>
-              {(editor || cast.some((r) => canEditCrewFor(b, r.team_id))) && <button className="lb-btn" onClick={() => setDialog('unavailable')}><Icon name="plus" /> Mark unavailable</button>}</div>
+              {(canEditAny || cast.some((r) => canEditCrewFor(b, r.team_id))) && <button className="lb-btn" onClick={() => setDialog('unavailable')}><Icon name="plus" /> Mark unavailable</button>}</div>
             {unavail.length === 0 ? <p className="lb-caption">No one is marked unavailable. When a scene is placed on a day a cast member cannot work, the strip and the top of this page say so.</p> : (
               <ul className="lb-unlist">
                 {cast.filter((r) => unavail.some((u) => u.row_id === r.id)).map((r) => (
                   <li key={r.id}><strong>{castLabel(r)}</strong>
                     <span className="lb-row">{unavail.filter((u) => u.row_id === r.id).map((u) => (
                       <span key={u.id} className="lb-chipx" title={u.note}>{formatDate(u.on_date)}{u.note ? ` · ${u.note}` : ''}
-                        {(editor || canEditCrewFor(b, r.team_id)) && <button className="lb-btn lb-btn--sm lb-btn--quiet" aria-label={`Remove ${formatDate(u.on_date)} for ${castLabel(r)}`} onClick={async () => { const { error: e } = await supabase.from('cast_unavailable').delete().eq('id', u.id); if (e) setError(errText(e)); refresh() }}><Icon name="cross" /></button>}
+                        {(canEditAny || canEditCrewFor(b, r.team_id)) && <button className="lb-btn lb-btn--sm lb-btn--quiet" aria-label={`Remove ${formatDate(u.on_date)} for ${castLabel(r)}`} onClick={async () => { const { error: e } = await supabase.from('cast_unavailable').delete().eq('id', u.id); if (e) setError(errText(e)); refresh() }}><Icon name="cross" /></button>}
                       </span>))}</span></li>
                 ))}
               </ul>
@@ -517,9 +547,10 @@ export default function SchedulePage() {
         </>
       )}
 
+      {dialog === 'lock' && sched && <LockDialog sched={sched} onClose={() => setDialog(null)} onDone={refresh} />}
       {dialog === 'new' && <ScheduleDialog pid={pid} sched={null} days={[]} usedDayIds={new Set()} onClose={() => setDialog(null)} onSaved={(id) => { choose(id); refresh() }} onDeleted={refresh} />}
       {dialog === 'edit' && sched && <ScheduleDialog pid={pid} sched={sched} days={days} usedDayIds={new Set(placements.map((p) => p.day_id))} onClose={() => setDialog(null)} onSaved={refresh} onDeleted={() => { choose(''); refresh() }} />}
-      {dialog === 'unavailable' && <UnavailableDialog pid={pid} cast={cast} canEditRow={(r) => editor || canEditCrewFor(b, r.team_id)} onClose={() => setDialog(null)} onSaved={refresh} />}
+      {dialog === 'unavailable' && <UnavailableDialog pid={pid} cast={cast} canEditRow={(r) => canEditAny || canEditCrewFor(b, r.team_id)} onClose={() => setDialog(null)} onSaved={refresh} />}
     </>
   )
 }

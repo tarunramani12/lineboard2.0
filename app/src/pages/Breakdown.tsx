@@ -64,7 +64,7 @@ function ItemRow({ item, editable, teamName, onChanged }: { item: BItem; editabl
           <span className="lb-caption">{item.notes || '–'}</span>
         </>
       )}
-      <span className="lb-caption lb-bdteam" title={editable ? 'Your team can edit this' : 'Owned by another team. Read only.'}>
+      <span className="lb-caption lb-bdteam" title={editable ? 'Your team can edit this' : 'Owned by another team'}>
         <Icon name={editable ? 'pencil' : 'lock'} /> {teamName}
       </span>
       {editable ? <button className="lb-btn lb-btn--sm lb-btn--quiet" aria-label={`Remove ${item.name}`} onClick={remove}>Remove</button> : <span />}
@@ -155,7 +155,6 @@ function SceneDialog({ scene, sceneIndex, items, allItems, form, castSuggestions
           {scene.revised_in ? <Badge kind="conflict"><Icon name="warn" /> Scene revised ({revisionLabel(scene.revised_in)})</Badge> : null}
         </div>
         <p className="lb-caption">{scene.heading || 'No heading yet'}</p>
-        {!canForm && <p className="lb-caption"><Icon name="lock" /> You can read this breakdown. Only teams with edit access to Breakdown can change it.</p>}
 
         <div className="lb-shotgrid">
           {field('bd-loc', 'Location', <input id="bd-loc" className="lb-input" value={draft.location} maxLength={200} disabled={!canForm || busy} onChange={(e) => set('location', e.target.value)} placeholder="Anna's kitchen" />)}
@@ -264,7 +263,7 @@ export default function Breakdown() {
       <>
         {head}
         <EmptyState title="The breakdown is not open to your team" action={isOwnerOrAdmin(b) ? <Link className="lb-btn" to="../team">Open Team and access</Link> : undefined}>
-          The owner can change this in Team and access.
+          The admin can change this in Team and access.
         </EmptyState>
       </>
     )

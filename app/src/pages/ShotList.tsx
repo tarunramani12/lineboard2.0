@@ -200,8 +200,8 @@ function ShotDialog({ shot: shot0, scene, sceneIndex, inScene, after, onClose, o
           {field('sh-crew', 'Crew needed', <ListPicker id="sh-crew" noun="role" value={draft.crew_needed} options={crewOptions} disabled={ro(ownerEd)} onChange={(v) => set('crew_needed', v)} />, crewOptions.length ? 'From Cast and crew.' : 'Add crew in Cast and crew to choose from a list.')}
         </div>
         <div className="lb-shotgrid">
-          {field('sh-vfx', 'VFX required', <textarea id="sh-vfx" className="lb-input lb-textarea" rows={2} value={draft.vfx_required} maxLength={1000} disabled={ro(vfxEd)} onChange={(e) => set('vfx_required', e.target.value)} />, ownerEd ? 'The VFX team can also fill this in.' : vfxEd ? 'You can edit this as the VFX team.' : 'Only the owning team or the VFX team can edit this.')}
-          {field('sh-sound', 'Sound effects required', <textarea id="sh-sound" className="lb-input lb-textarea" rows={2} value={draft.sound_required} maxLength={1000} disabled={ro(soundEd)} onChange={(e) => set('sound_required', e.target.value)} />, ownerEd ? 'The Sound team can also fill this in.' : soundEd ? 'You can edit this as the Sound team.' : 'Only the owning team or the Sound team can edit this.')}
+          {field('sh-vfx', 'VFX required', <textarea id="sh-vfx" className="lb-input lb-textarea" rows={2} value={draft.vfx_required} maxLength={1000} disabled={ro(vfxEd)} onChange={(e) => set('vfx_required', e.target.value)} />, ownerEd ? 'The VFX team can also fill this in.' : undefined)}
+          {field('sh-sound', 'Sound effects required', <textarea id="sh-sound" className="lb-input lb-textarea" rows={2} value={draft.sound_required} maxLength={1000} disabled={ro(soundEd)} onChange={(e) => set('sound_required', e.target.value)} />, ownerEd ? 'The Sound team can also fill this in.' : undefined)}
         </div>
         {field('sh-fx', 'Special effects', <textarea id="sh-fx" className="lb-input lb-textarea" rows={2} value={draft.special_effects} maxLength={1000} disabled={ro(ownerEd)} onChange={(e) => set('special_effects', e.target.value)} />)}
         <label className="lb-radio"><input type="checkbox" checked={draft.silent} disabled={ro(ownerEd)} onChange={(e) => set('silent', e.target.checked)} /><span>Silent shot (no sound recorded)</span></label>
@@ -223,7 +223,6 @@ function ShotDialog({ shot: shot0, scene, sceneIndex, inScene, after, onClose, o
                 <button key={s} type="button" aria-pressed={status === s} aria-current={status === s ? 'true' : undefined} disabled={busy || !statusEd} onClick={() => setStatus(s)}>{STATUS_TEXT[s]}</button>
               ))}
             </div>
-            {!statusEd && <span className="lb-caption"><Icon name="lock" /> Only the AD team and the owner can change status.</span>}
           </div>
         </div>
         {shot && <p className="lb-caption">Added by {nameOf(shot.created_by)}. Last edited by {nameOf(shot.updated_by)} on {new Date(shot.updated_at).toLocaleString()}.</p>}
@@ -351,7 +350,7 @@ export default function ShotList() {
         {head}
         <EmptyState title="The shot list is not open to your team"
           action={isOwnerOrAdmin(b) ? <Link className="lb-btn" to="../team">Open Team and access</Link> : undefined}>
-          The owner can change this in Team and access.
+          The admin can change this in Team and access.
         </EmptyState>
       </>
     )
@@ -428,7 +427,7 @@ export default function ShotList() {
                       <span className="lb-shotmeta">
                         <span className="lb-shotcell">{[sizeName(s.size), s.movement].filter(Boolean).join(' · ') || <span className="lb-muted">–</span>}</span>
                         <span className="lb-shotcell">{s.lens || <span className="lb-muted">–</span>}</span>
-                        <span className="lb-shotcell lb-shotteam" title={editable ? 'Your team can edit this shot' : 'Owned by another team. Read only.'}>
+                        <span className="lb-shotcell lb-shotteam" title={editable ? 'Your team can edit this shot' : 'Owned by another team'}>
                           <Icon name={editable ? 'pencil' : 'lock'} /> <span className="lb-shotteamname">{teamName(s.team_id)}</span>
                         </span>
                       </span>

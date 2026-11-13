@@ -15,7 +15,7 @@ export default defineConfig({
         globIgnores: ['**/*-{cyrillic,cyrillic-ext,vietnamese,greek,greek-ext}-*.woff2'],
       },
       manifest: {
-        name: 'LineBoard 2.0',
+        name: 'LineBoard',
         short_name: 'LineBoard',
         description: 'From script to call sheet.',
         display: 'standalone',

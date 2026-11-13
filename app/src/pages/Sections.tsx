@@ -11,6 +11,8 @@ import type { Project } from '../lib/types'
 import { isOwner, isOwnerOrAdmin, levelFor } from '../lib/project'
 import { SECTIONS } from '../lib/sections'
 import { removeFolder } from '../lib/storyboard'
+import { RequestAccessCard } from '../components/AccessRequests'
+import { removeMoodFolder } from '../lib/bible'
 import { supabase } from '../lib/supabase'
 
 /** A section that exists in the navigation but is built in a later step. */
@@ -31,7 +33,7 @@ export function SectionPage() {
       {st.locked ? (
         <EmptyState title={`${def.label} is not open to your team`}
           action={isOwnerOrAdmin(b) ? <Link className="lb-btn" to="../team">Open Team and access</Link> : undefined}>
-          {owner ? `${owner.name}, the owner, can change this in Team and access.` : 'The owner can change this in Team and access.'}
+          {owner ? `${owner.name}, the admin, can change this in Team and access.` : 'The admin can change this in Team and access.'}
         </EmptyState>
       ) : (
         <EmptyState title={`No ${def.label.toLowerCase()} yet`}>
@@ -69,6 +71,7 @@ export function ExportSettings() {
   async function remove() {
     const ok = await act.run(async () => {
       await removeFolder(pid).catch(() => undefined)   // the storyboard pictures go with the project
+      await removeMoodFolder(pid).catch(() => undefined)   // and the moodboard pictures
       const { error } = await supabase.from('projects').delete().eq('id', pid)
       if (error) throw error
       return true
@@ -108,21 +111,20 @@ export function ExportSettings() {
             </div>
             {backError && <p className="lb-error" role="alert">{backError}</p>}
           </div>
-        ) : (
-          <p className="lb-caption"><Icon name="lock" /> Only the owner and admins can download a full backup. Script, shot list and storyboard exports are on their own pages.</p>
-        )}
+        ) : null}
       </section>
       {isOwnerOrAdmin(b) && <MailSettings pid={pid} project={b.project} owner={isOwner(b)} />}
+      <RequestAccessCard b={b} pid={pid} />
       <section className="lb-card lb-stack" aria-label="PDFs and files">
         <h2 className="lb-heading">PDFs for each department</h2>
         <p className="lb-caption">Each department downloads its own file from its own page, with the paper size you choose. You only see the pages you have access to. A lock means your team cannot open that page.</p>
         <ul className="lb-unlist">
-          {([['script', 'Script (screenplay layout, scene numbers)', 'script', 'script'], ['shots', 'Shot list', 'shots', 'shots'], ['storyboard', 'Storyboard pictures', 'storyboard', 'shots'], ['breakdown', 'Breakdown', 'breakdown', 'breakdown'], ['cast', 'Cast and crew', 'cast', 'cast_crew'], ['props', 'Props, one per schedule', 'props', 'props'], ['equipment', 'Equipment, one per schedule', 'equipment', 'equipment'], ['schedule', 'Schedule', 'schedule', 'schedule'], ['callsheets', 'Call sheets, one per shoot day', 'callsheets', 'call_sheets']] as const).map(([path, label, , key]) => {
+          {([['script', 'Script (screenplay layout, scene numbers)', 'script', 'script'], ['shots', 'Shot list', 'shots', 'shots'], ['storyboard', 'Storyboard pictures', 'storyboard', 'shots'], ['bible', 'Project bible', 'bible', 'bible'], ['breakdown', 'Breakdown', 'breakdown', 'breakdown'], ['cast', 'Cast and crew', 'cast', 'cast_crew'], ['props', 'Props, one per schedule', 'props', 'props'], ['equipment', 'Equipment, one per schedule', 'equipment', 'equipment'], ['schedule', 'Schedule', 'schedule', 'schedule'], ['callsheets', 'Call sheets, one per shoot day', 'callsheets', 'call_sheets']] as const).map(([path, label, , key]) => {
             const open = levelFor(b, key) !== 'none'
             return (
               <li key={path} className={open ? 'is-click' : undefined} style={{ justifyContent: 'space-between', minHeight: 44 }} {...(open ? rowOpen(() => nav(`/p/${pid}/${path}`)) : {})}>
                 {open ? <Link className="lb-shotdesc" to={`/p/${pid}/${path}`}>{label}</Link> : <span>{label}</span>}
-                {open ? <span aria-hidden="true" style={{ fontSize: 20, fontWeight: 800 }}>›</span> : <span className="lb-caption"><Icon name="lock" /> No access</span>}
+                {open ? <span aria-hidden="true" style={{ fontSize: 20, fontWeight: 800 }}>›</span> : <span className="lb-rolock"><Icon name="lock" /><span className="lb-sr">No access</span></span>}
               </li>
             )
           })}
@@ -131,7 +133,7 @@ export function ExportSettings() {
       {owner && (
         <section className="lb-card lb-stack">
           <h2 className="lb-heading">Transfer ownership</h2>
-          <p>Hand this project to one of its admins. They become the owner and you become an admin. Only the owner can lock the script, delete the project or transfer it.</p>
+          <p>Hand this project to one of its admins. They become the main admin and you stay an admin. Only the admin can lock the script, delete the project or transfer it.</p>
           {admins.length === 0 && <p className="lb-caption">There is no admin yet. Make someone an admin in Team and access first.</p>}
           <div><button className="lb-btn" disabled={admins.length === 0} onClick={() => { setDialog('transfer'); setHeir(admins[0]?.id ?? ''); setTyped(''); act.setError(null) }}>Transfer ownership</button></div>
         </section>
@@ -146,7 +148,7 @@ export function ExportSettings() {
           </>
         ) : (
           <>
-            <p>You will lose access to this project. The owner or a head of department can invite you again.</p>
+            <p>You will lose access to this project. An admin or the head of department can invite you again.</p>
             <div><button className="lb-btn lb-btn--danger" onClick={() => { setDialog('leave'); act.setError(null) }}>Leave project</button></div>
           </>
         )}
@@ -193,7 +195,7 @@ export function ExportSettings() {
   )
 }
 
-/** Who the project's emails come from. Only the owner changes it; admins can see it and what was sent. */
+/** Who the project's emails come from. Only the admin changes it; admins can see it and what was sent. */
 function MailSettings({ pid, project, owner }: { pid: string; project: Project; owner: boolean }) {
   const qc = useQueryClient()
   const { user } = useAuth()
@@ -236,9 +238,7 @@ function MailSettings({ pid, project, owner }: { pid: string; project: Project; 
           </div>
           {act.error && <p className="lb-error" role="alert">{act.error}</p>}
         </div>
-      ) : (
-        <p className="lb-caption"><Icon name="lock" /> Only the owner can change this.</p>
-      )}
+      ) : null}
       <h3 className="lb-heading" style={{ fontSize: 16, margin: 0 }}>Recent email {waiting > 0 && <Badge kind="stale">{waiting} not sent yet</Badge>}</h3>
       {rows.length === 0 ? <p className="lb-caption">Nothing sent yet.</p> : (
         <ul className="lb-unlist">

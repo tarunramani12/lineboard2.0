@@ -1,6 +1,6 @@
 import { useQuery } from '@tanstack/react-query'
 import { supabase } from './supabase'
-import { isOwnerOrAdmin, type Bundle } from './project'
+import { isOwnerOrAdmin, type Bundle, hasEditGrantFor } from './project'
 import type { Scene, Team } from './types'
 
 export type ShotStatus = 'planned' | 'done' | 'dropped'
@@ -59,7 +59,7 @@ function accessLevel(b: Bundle, teamId: string): 'none' | 'view' | 'edit' {
 /** Edit access on Shots for this team: the team's edit level, plus HOD or an edit grant. Owner and admins always. */
 export function canEditShotsFor(b: Bundle, teamId: string): boolean {
   if (isOwnerOrAdmin(b)) return true
-  return b.myLinks.some((l) => l.team_id === teamId && (l.is_hod || l.can_edit) && accessLevel(b, teamId) === 'edit')
+  return b.myLinks.some((l) => l.team_id === teamId && (l.is_hod || l.can_edit) && accessLevel(b, teamId) === 'edit') || hasEditGrantFor(b, 'shots', teamId)
 }
 /** Teams a new shot can belong to: the ones this person edits for. */
 export function teamsIEdit(b: Bundle): Team[] {

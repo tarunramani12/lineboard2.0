@@ -1,4 +1,5 @@
 import { useState, type FormEvent } from 'react'
+import { AccessRequestsPanel, ScheduleDrafts } from '../components/AccessRequests'
 import { useOutletContext } from 'react-router-dom'
 import { useQuery, useQueryClient } from '@tanstack/react-query'
 import type { Ctx } from '../components/ProjectLayout'
@@ -35,8 +36,8 @@ export default function TeamAccess() {
     return (
       <>
         <div className="lb-page-head"><h1 className="lb-title">Team and access</h1><Permission level="locked" why="No access" /></div>
-        <EmptyState title="Team and access is for the owner, admins and heads of department">
-          Ask the owner to make you head of department if you need to add people to a team.
+        <EmptyState title="Team and access is for the admins and heads of department">
+          Ask the admin to make you head of department if you need to add people to a team.
         </EmptyState>
       </>
     )
@@ -45,13 +46,15 @@ export default function TeamAccess() {
     <>
       <div className="lb-page-head">
         <h1 className="lb-title">Team and access</h1>
-        <Permission level="edit" team={admin ? 'Owner and admins' : 'Your team'} />
+        <Permission level="edit" team={admin ? 'Admins' : 'Your team'} />
       </div>
-      {!admin && <p className="lb-caption">You manage your own team. The owner sets what each team can see and who reads which scenes.</p>}
+      {!admin && <p className="lb-caption">You manage your own team. The admin sets what each team can see and who reads which scenes.</p>}
       <JoinRequests pid={pid} />
+      <AccessRequestsPanel b={b} pid={pid} />
       {teams.map((t) => <TeamCard key={t.id} team={t} b={b} pid={pid} invites={ic.data?.invites ?? []} codes={ic.data?.codes ?? []} />)}
       {admin && <Matrix b={b} pid={pid} />}
       {admin && <ScriptSharing b={b} pid={pid} />}
+      {admin && <ScheduleDrafts b={b} pid={pid} />}
     </>
   )
 }
@@ -82,7 +85,7 @@ function JoinRequests({ pid }: { pid: string }) {
             <li key={r.id} style={{ justifyContent: 'space-between' }}>
               <span className="lb-stack" style={{ gap: 2 }}>
                 <strong>{r.name} <span className="lb-muted">{r.email}</span></strong>
-                <span className="lb-caption">Asks to join {r.team_name}{r.role ? ` as ${r.role}` : ''} on {fmt(r.created_at)}. {r.has_hod ? `The head of ${r.team_name} or the owner decides.` : `${r.team_name} has no head of department, so the owner or an admin decides.`}</span>
+                <span className="lb-caption">Asks to join {r.team_name}{r.role ? ` as ${r.role}` : ''} on {fmt(r.created_at)}. {r.has_hod ? `The head of ${r.team_name} or the admin decides.` : `${r.team_name} has no head of department, so an admin decides.`}</span>
               </span>
               <span className="lb-row">
                 <button className="lb-btn lb-btn--primary lb-btn--sm" disabled={busy === r.id} onClick={() => void decide(r, true)}>Approve</button>
@@ -100,7 +103,7 @@ function Chips({ p, b, teamId }: { p: PersonRow; b: Bundle; teamId: string }) {
   const link = b.memberTeams.find((l) => l.member_id === p.id && l.team_id === teamId)
   return (
     <span className="lb-row" style={{ gap: 4 }}>
-      {p.role !== 'member' && <Badge kind="revised">{p.role}</Badge>}
+      {p.role !== 'member' && <Badge kind="revised">Admin</Badge>}
       {link?.is_hod && <Badge kind="plain">HOD</Badge>}
       {link && !link.is_hod && link.can_edit && <Badge kind="plain">Edit access</Badge>}
     </span>
@@ -116,6 +119,7 @@ function TeamCard({ team, b, pid, invites, codes }: { team: Team; b: Bundle; pid
   const [managing, setManaging] = useState<PersonRow | null>(null)
   const [addId, setAddId] = useState('')
   const [email, setEmail] = useState('')
+  const [asHod, setAsHod] = useState(false)   // an admin chooses head of department or member for each invite
   const [days, setDays] = useState('14')
   const [copied, setCopied] = useState<string | null>(null)
   const add = useAction(), inv = useAction(), code = useAction()
@@ -130,9 +134,9 @@ function TeamCard({ team, b, pid, invites, codes }: { team: Team; b: Bundle; pid
   async function invite(e: FormEvent) {
     e.preventDefault()
     await inv.run(async () => {
-      const { error } = await supabase.from('invites').insert({ project_id: pid, team_id: team.id, email: email.trim().toLowerCase(), invited_by: b.me.account_id })
+      const { error } = await supabase.from('invites').insert({ project_id: pid, team_id: team.id, email: email.trim().toLowerCase(), invited_by: b.me.account_id, is_hod: admin && asHod })
       if (error) throw error
-      setEmail(''); refresh()
+      setEmail(''); setAsHod(false); refresh()
     }, friendlyError)
   }
   async function newCode() {
@@ -195,7 +199,7 @@ function TeamCard({ team, b, pid, invites, codes }: { team: Team; b: Bundle; pid
             <button className="lb-btn lb-btn--sm" onClick={newCode} disabled={code.busy}><Icon name="plus" /> New code</button>
           </span>
         </div>
-        <p className="lb-caption">Someone who enters a code asks to join and chooses their team. {team.name} is chosen for them at first. The head of the team they choose, or the owner, approves the request. They then join as a read-only member, and only the owner or head of department can give them edit access.</p>
+        <p className="lb-caption">Someone who enters a code asks to join and chooses their team. {team.name} is chosen for them at first. The head of the team they choose, or the admin, approves the request. They then join as a read-only member, and only an admin or the head of department can give them edit access.</p>
         {code.error && <p className="lb-error" role="alert">{code.error}</p>}
         {myCodes.length === 0 && <p className="lb-caption">No codes yet.</p>}
         {myCodes.map((c) => {
@@ -221,13 +225,22 @@ function TeamCard({ team, b, pid, invites, codes }: { team: Team; b: Bundle; pid
         <span className="lb-label">Email invites</span>
         <form className="lb-row" onSubmit={invite} style={{ alignItems: 'flex-end' }}>
           <div style={{ flex: 1, minWidth: 200 }}><Field label="Email address" type="email" required value={email} onChange={(e) => setEmail(e.target.value)} /></div>
+          {admin && (
+            <div className="lb-field" style={{ minWidth: 190 }}>
+              <label htmlFor={'inv-role-' + team.id}>Joins as</label>
+              <select id={'inv-role-' + team.id} className="lb-input" value={asHod ? 'hod' : 'member'} onChange={(e) => setAsHod(e.target.value === 'hod')}>
+                <option value="member">Member</option>
+                <option value="hod">Head of department</option>
+              </select>
+            </div>
+          )}
           <button className="lb-btn" disabled={inv.busy || !email.trim()}>Invite</button>
         </form>
         <p className="lb-caption">An invite is tied to one address. When that person signs up or signs in with it, they land in {team.name}. Sending the email itself is not built yet, so tell them to sign up with this address.</p>
         {inv.error && <p className="lb-error" role="alert">{inv.error}</p>}
         {myInvites.map((i) => (
           <div key={i.id} className="lb-row" style={{ justifyContent: 'space-between' }}>
-            <span>{i.email} <span className="lb-caption">· waiting · expires {fmt(i.expires_at)}</span></span>
+            <span>{i.email} <span className="lb-caption">· {i.is_hod ? 'head of department · ' : ''}waiting · expires {fmt(i.expires_at)}</span></span>
             <button className="lb-btn lb-btn--sm" onClick={() => patch('invites', i.id, 'delete')}>Cancel invite</button>
           </div>
         ))}
@@ -271,7 +284,7 @@ function PersonDialog({ p, team, b, pid, onClose, admin }: { p: PersonRow; team:
   }
   return (
     <Dialog title={p.name} onClose={onClose}>
-      <p>{team.name}. {p.role === 'owner' ? 'Owner of the project.' : p.role === 'admin' ? 'Admin: sees and edits everything except deleting the project.' : link.is_hod ? 'Head of department.' : link.can_edit ? 'Has edit access in this team.' : 'Read-only member.'}</p>
+      <p>{team.name}. {p.role === 'owner' ? 'Admin of the project.' : p.role === 'admin' ? 'Admin: sees and edits everything except deleting the project.' : link.is_hod ? 'Head of department.' : link.can_edit ? 'Has edit access in this team.' : 'Read-only member.'}</p>
       {act.error && <p className="lb-error" role="alert">{act.error}</p>}
       <div className="lb-stack">
         {!link.is_hod && p.role === 'member' && (
@@ -319,7 +332,7 @@ function Matrix({ b, pid }: { b: Bundle; pid: string }) {
     await act.run(async () => {
       const { data, error } = await supabase.from('teams').insert({ project_id: pid, name: name.trim() }).select('id').single()
       if (error) throw error
-      const rows = SECTION_KEYS.map((section) => ({ team_id: data.id as string, section, level: ((['schedule', 'call_sheets', 'cast_crew'] as string[]).includes(section) ? 'view' : 'none') as AccessLevel }))
+      const rows = SECTION_KEYS.map((section) => ({ team_id: data.id as string, section, level: (section === 'equipment' ? 'edit' : (['schedule', 'call_sheets'] as string[]).includes(section) ? 'view' : 'none') as AccessLevel }))
       const r = await supabase.from('team_section_access').insert(rows)
       if (r.error) throw r.error
       setName(''); refresh()
@@ -430,7 +443,7 @@ function ScriptSharing({ b, pid }: { b: Bundle; pid: string }) {
     <section className="lb-box">
       <div className="lb-section-pad lb-stack">
         <h2 className="lb-heading">Who reads the script</h2>
-        <p className="lb-caption">Everyone sees scene numbers and headings. Action and dialogue show only to the owner, admins and people you choose here. A scene added later, such as 42A, is not shared automatically with people who hold selected scenes.</p>
+        <p className="lb-caption">Everyone sees scene numbers and headings. Action and dialogue show only to the admins and people you choose here. A scene added later, such as 42A, is not shared automatically with people who hold selected scenes.</p>
       </div>
       {people.length === 0 && <div className="lb-section-pad"><EmptyState title="No members yet">People who join as members appear here.</EmptyState></div>}
       {people.map((p) => (

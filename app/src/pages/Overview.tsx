@@ -49,7 +49,7 @@ export default function Overview() {
         </div>
         <div className="lb-card lb-stack">
           <span className="lb-label">Next shoot day</span>
-          {!seesSchedule ? <><span className="lb-heading">Not open to your team</span><span className="lb-caption">The owner can change this in Team and access.</span></>
+          {!seesSchedule ? <><span className="lb-heading">Not open to your team</span><span className="lb-caption">The admin can change this in Team and access.</span></>
             : next ? (
               <Link to="schedule" className="lb-tilelink">
                 <span className="lb-number-lg">DAY {nextNo}</span>
@@ -60,7 +60,7 @@ export default function Overview() {
         </div>
         <div className="lb-card lb-stack">
           <span className="lb-label">Latest call sheet</span>
-          {!seesSheets ? <><span className="lb-heading">Not open to your team</span><span className="lb-caption">The owner can change this in Team and access.</span></>
+          {!seesSheets ? <><span className="lb-heading">Not open to your team</span><span className="lb-caption">The admin can change this in Team and access.</span></>
             : latest ? (
               <Link to={`callsheets?day=${latest.day_id}`} className="lb-tilelink">
                 <span className="lb-number-lg">REV {latest.rev_no}</span>
@@ -85,7 +85,7 @@ export default function Overview() {
           return (
             <div key={p.id} className="lb-tr" style={{ gridTemplateColumns: 'minmax(0,1fr) auto' }}>
               <span><span className="lb-body-strong">{p.name}</span> <span className="lb-caption">{teams.join(', ') || 'No team'}</span></span>
-              <Badge kind="plain">{p.role}</Badge>
+              <Badge kind="plain">{p.role === 'member' ? 'Member' : 'Admin'}</Badge>
             </div>
           )
         })}

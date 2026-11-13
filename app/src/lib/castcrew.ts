@@ -1,6 +1,6 @@
 import { useQuery } from '@tanstack/react-query'
 import { supabase } from './supabase'
-import { isOwnerOrAdmin, type Bundle } from './project'
+import { isOwnerOrAdmin, type Bundle, hasEditGrantFor } from './project'
 import type { Team } from './types'
 
 export type CrewKind = 'cast' | 'crew'
@@ -49,7 +49,7 @@ export function useCastCrew(pid: string | undefined, withContacts: boolean) {
 function accessLevel(b: Bundle, teamId: string) { return b.access.find((a) => a.team_id === teamId && a.section === 'cast_crew')?.level ?? 'none' }
 export function canEditCrewFor(b: Bundle, teamId: string): boolean {
   if (isOwnerOrAdmin(b)) return true
-  return b.myLinks.some((l) => l.team_id === teamId && (l.is_hod || l.can_edit) && accessLevel(b, teamId) === 'edit')
+  return b.myLinks.some((l) => l.team_id === teamId && (l.is_hod || l.can_edit) && accessLevel(b, teamId) === 'edit') || hasEditGrantFor(b, 'cast_crew', teamId)
 }
 export const teamsICanEditCrew = (b: Bundle): Team[] => b.teams.filter((t) => canEditCrewFor(b, t.id))
 /** Owner, admins, and AD-team members who can see Cast and crew. */

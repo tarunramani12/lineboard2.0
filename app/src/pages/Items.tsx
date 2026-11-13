@@ -50,7 +50,6 @@ function ItemDialog({ kind, pid, scheduleId, item, cost, links, sceneOptions, ca
   const [error, setError] = useState<string | null>(null)
   const [confirm, setConfirm] = useState(false)
   const dis = !editable || busy
-  const teamName = (id: string) => b.teams.find((t) => t.id === id)?.name ?? 'No team'
 
   useEffect(() => {
     const h = (e: KeyboardEvent) => { if (e.key === 'Escape') onClose() }
@@ -112,8 +111,6 @@ function ItemDialog({ kind, pid, scheduleId, item, cost, links, sceneOptions, ca
     <div className="lb-scrim" onMouseDown={(e) => { if (e.target === e.currentTarget) onClose() }}>
       <div className="lb-dialog lb-dialog--wide" role="dialog" aria-modal="true" aria-label={item ? `Edit ${info.one}` : `New ${info.one}`}>
         <h2 className="lb-heading" style={{ margin: 0 }}>{item ? item.name : `Add ${info.one === 'prop' ? 'a prop' : 'an item'}`}</h2>
-        {item && !editable && <p className="lb-caption"><Icon name="lock" /> Read only. This {info.one} is managed by {teamName(item.team_id)}.</p>}
-        {!item && mine.length === 0 && <p className="lb-caption"><Icon name="lock" /> Only teams with edit access to {info.title} can add to the list.</p>}
         <div className="lb-shotgrid">
           {field('it-name', 'Name', <input id="it-name" className="lb-input" autoFocus={!item} value={name} maxLength={120} disabled={dis} onChange={(e) => setName(e.target.value)} />)}
           {field('it-qty', 'Quantity', <input id="it-qty" type="number" min={1} max={9999} className="lb-input" value={qty} disabled={dis} onChange={(e) => setQty(e.target.value)} />, 'At least 1.')}
@@ -149,16 +146,14 @@ function ItemDialog({ kind, pid, scheduleId, item, cost, links, sceneOptions, ca
                 <select aria-label="Currency" className="lb-input" style={{ width: 'auto' }} value={currency} disabled={dis || !canCost} onChange={(e) => setCurrency(e.target.value)}>{[...new Set([...CURRENCIES, currency])].map((c) => <option key={c}>{c}</option>)}</select></span>
               <input aria-label="Cost note" className="lb-input" value={costNote} maxLength={200} disabled={dis || !canCost} onChange={(e) => setCostNote(e.target.value)} placeholder="Note, for example per day" />
             </div>
-            <span className="lb-caption"><Icon name="lock" /> Only the owner, admins and the Production team see cost.</span>
           </div>
-        ) : <p className="lb-caption"><Icon name="lock" /> Cost is visible only to the owner, admins and the Production team.</p>}
+        ) : null}
         {canPick ? (
           <div className="lb-field">
             <label htmlFor="it-team">Managed by</label>
             <select id="it-team" className="lb-input" value={teamId} onChange={(e) => setTeamId(e.target.value)}>{teamChoices.map((t) => <option key={t.id} value={t.id}>{t.name}</option>)}</select>
-            <span className="lb-caption">Only this team edits the {info.one}. Only the owner or an admin can change it.</span>
           </div>
-        ) : <p className="lb-caption">Managed by {teamName(teamId)}. Only this team edits the {info.one}.</p>}
+        ) : null}
         {item && <p className="lb-caption">Last edited {new Date(item.updated_at).toLocaleString()}.</p>}
         {error && <p className="lb-error" role="alert">{error}</p>}
         <div className="lb-actions" style={{ justifyContent: 'space-between' }}>
@@ -227,7 +222,7 @@ export default function ItemsPage({ kind }: { kind: ItemKind }) {
     return (
       <>
         {head}
-        <EmptyState title={`${info.title} is not open to your team`} action={isOwnerOrAdmin(b) ? <Link className="lb-btn" to="../team">Open Team and access</Link> : undefined}>The owner can change this in Team and access.</EmptyState>
+        <EmptyState title={`${info.title} is not open to your team`} action={isOwnerOrAdmin(b) ? <Link className="lb-btn" to="../team">Open Team and access</Link> : undefined}>The admin can change this in Team and access.</EmptyState>
       </>
     )
   }
@@ -271,7 +266,9 @@ export default function ItemsPage({ kind }: { kind: ItemKind }) {
   return (
     <>
       {head}
-      <p className="lb-caption">One {info.one === 'prop' ? 'prop' : 'equipment'} list for each schedule. Each team adds its own and only that team edits it. Cost is visible only to the owner, admins and the Production team.</p>
+      <p className="lb-caption">{kind === 'equipment'
+        ? 'One equipment list for each schedule. Each team lists its own equipment and sees only its own. The head of department edits it. Cost is visible only to the admins and the Production team.'
+        : 'One prop list for each schedule. Each team adds its own and only that team edits it. Cost is visible only to the admins and the Production team.'}</p>
       {error && <p className="lb-error" role="alert">{error}</p>}
       {note && <p className="lb-caption" role="status">{note}</p>}
       {sched.isLoading || itemsQ.isLoading ? <p className="lb-caption" role="status">Loading</p> : !current ? (
@@ -337,7 +334,7 @@ export default function ItemsPage({ kind }: { kind: ItemKind }) {
             <EmptyState title={`No ${info.plural} on this list yet`}>{mine.length > 0 ? `Add them one at a time${suggestions.length ? ', or use the breakdown suggestions above' : ''}${others.length ? ', or copy from another schedule' : ''}.` : `The teams that edit ${info.title} add to this list.`}</EmptyState>
           ) : (
             <div className="lb-sheet">
-              <div className={'lb-thead lb-itrow lb-ithead' + (seeCost ? ' has-cost' : '')}><span>Name</span><span>Qty</span><span>Category</span><span>Status</span><span>Supplier</span>{seeCost && <span>Cost</span>}</div>
+              <div className={'lb-thead lb-itrow lb-ithead' + (seeCost ? ' has-cost' : '')}><span>Name</span><span>Qty</span><span>Category</span><span>Status</span><span>Supplier</span>{seeCost && <span>Cost</span>}<span className="lb-cclock" /></div>
               {shown.map((i) => {
                 const editable = canEditItemFor(b, kind, i.team_id)
                 const c = costs.get(i.id)
@@ -347,13 +344,13 @@ export default function ItemsPage({ kind }: { kind: ItemKind }) {
                   <div className={'lb-itrow lb-ccitem is-click' + (seeCost ? ' has-cost' : '')} {...rowOpen(() => setOpen({ id: i.id }))}>
                     <button className="lb-shotdesc" onClick={() => setOpen({ id: i.id })} aria-label={`Open ${i.name}`}>
                       {i.name}
-                      {!editable && <Badge kind="plain"><Icon name="lock" /> Read only</Badge>}
                     </button>
                     <span className="lb-shotcell">{i.quantity}</span>
                     <span className="lb-shotcell">{i.category || <span className="lb-muted">–</span>}</span>
                     <span className="lb-shotcell"><Badge kind={i.status === 'ready' || i.status === 'returned' ? 'plain' : i.status === 'confirmed' ? 'revised' : 'stale'}>{STATUS_LABEL[i.status]}</Badge></span>
                     <span className="lb-shotcell">{i.supplier || <span className="lb-muted">–</span>}</span>
                     {seeCost && <span className="lb-shotcell">{c ? formatMoney(c.amount, c.currency) : <span className="lb-muted">–</span>}</span>}
+                    <span className="lb-cclock">{!editable && <span className="lb-rolock" title="Managed by another team"><Icon name="lock" /><span className="lb-sr">Read only</span></span>}</span>
                   </div>
                   </SwipeRow>
                 )

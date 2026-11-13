@@ -10,7 +10,7 @@ export interface PendingJoinRequest {
 }
 export interface CodeLookup { project_name: string; team_id: string; teams: { id: string; name: string }[] }
 
-/** Who will answer a request: the head of the team when there is one, otherwise the owner. */
+/** Who will answer a request: the head of the team when there is one, otherwise the admin. */
 export const whoDecides = (r: { has_hod: boolean; team_name: string }) => (r.has_hod ? `the head of ${r.team_name}` : 'the project owner')
 
 export function useMyJoinRequests(userId: string | undefined) {

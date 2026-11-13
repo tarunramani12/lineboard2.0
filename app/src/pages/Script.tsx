@@ -16,6 +16,7 @@ import {
 } from '../lib/script'
 import { SECTIONS } from '../lib/sections'
 import { supabase } from '../lib/supabase'
+import { useScriptZoom, ZOOM_STEPS } from '../lib/zoom'
 import type { Scene } from '../lib/types'
 import type { CSSProperties } from 'react'
 
@@ -243,6 +244,7 @@ export default function Script() {
   const level = levelFor(b, 'script')
   const canEdit = level === 'edit'
   const locked = b.project.script_locked
+  const zoom = useScriptZoom()
   const def = SECTIONS.find((s) => s.path === 'script')!
   const st = navState(b, def)
   const [editing, setEditing] = useState<string | null>(null)
@@ -345,7 +347,7 @@ export default function Script() {
         {head}
         <EmptyState title="The script is not open to your team"
           action={isOwnerOrAdmin(b) ? <Link className="lb-btn" to="../team">Open Team and access</Link> : undefined}>
-          The owner can change this in Team and access.
+          The admin can change this in Team and access.
         </EmptyState>
       </>
     )
@@ -409,20 +411,19 @@ export default function Script() {
   return (
     <>
       {head}
-      <p className="lb-caption">Everyone on the project sees every scene heading. Action and dialogue show only for scenes shared with you. One person writes a scene at a time. Scenes get their numbers when the owner locks the script.</p>
+      <p className="lb-caption">Everyone on the project sees every scene heading. Action and dialogue show only for scenes shared with you. One person writes a scene at a time. Scenes get their numbers when the admin locks the script.</p>
       <div className="lb-row">
         {canEdit && !writing && <button className="lb-btn lb-btn--primary" onClick={() => startWriting(null)}><Icon name="plus" /> Write a scene</button>}
         {isOwner(b) && !writing && <Link className="lb-btn" to="import">{scenes.length ? 'Import a new draft' : 'Import a script'}</Link>}
         {(anyReadable || active.length > 0) && <button className="lb-btn" onClick={() => { setExportError(null); setExportOpen(true) }}>Export</button>}
         {canStartRevision && <button className="lb-btn" onClick={() => setNextRevDialog(true)}>Start next revision</button>}
         {isOwner(b) && <button className="lb-btn" onClick={() => { navAct.setError(null); setLockDialog(true) }}><Icon name="lock" /> {locked ? 'Unlock script' : 'Lock script'}</button>}
-        {phone && scenes.length > 0 && <button className="lb-btn" onClick={() => setSheetOpen(true)}>Scenes {active.length}</button>}
         {totalLines > 0 && <span className="lb-caption">{aboutPages(totalLines)} in the scenes you can read</span>}
       </div>
       {navAct.error && !lockDialog && <p className="lb-error" role="alert">{navAct.error}</p>}
       <div className={'lb-scriptlayout' + (phone || scenes.length === 0 ? ' is-single' : '') + (navCollapsed ? ' is-collapsed' : '')}>
       {!phone && scenes.length > 0 && <aside className="lb-scenenav-wrap"><SceneNav {...navProps} collapsed={navCollapsed} onToggle={toggleNav} /></aside>}
-      <div className="lb-scriptmain">
+      <div className="lb-scriptmain" ref={zoom.setEl}>
       {draftNote ? <Banner lead="New draft">{draftNote} Changed scenes are tagged with the revision, and numbers did not move.</Banner> : null}
       {imported ? <Banner lead="Imported">{imported} {imported === 1 ? 'scene was' : 'scenes were'} added to the script.</Banner> : null}
       {notice && <Banner kind="alert" lead="Cannot edit yet">{notice}</Banner>}
@@ -431,11 +432,20 @@ export default function Script() {
       )}
       {!sq.isLoading && scenes.length === 0 && !writing && (
         <EmptyState title="No script yet">
-          {canEdit ? 'Write the first scene here. Each scene becomes a record the shot list, breakdown and schedule attach to.' : 'The owner or a writer will add scenes here.'}
+          {canEdit ? 'Write the first scene here. Each scene becomes a record the shot list, breakdown and schedule attach to.' : 'The admin or a writer will add scenes here.'}
         </EmptyState>
       )}
       {scenes.length > 0 && (
-        <div className="lb-paper">
+        <>
+        {phone && (
+          <div className="lb-scenebar">
+            <button type="button" className="lb-btn lb-btn--sm lb-scenebar-btn" aria-expanded={sheetOpen} aria-controls="scenebar-panel" onClick={() => setSheetOpen((v) => !v)}>
+              <Icon name="panel" /> Scenes {active.length}{activeId ? ` · ${scenes.find((x) => x.id === activeId)?.display_number ?? 'now'}` : ''}
+            </button>
+            {sheetOpen && <div id="scenebar-panel" className="lb-scenebar-panel"><SceneNav {...navProps} collapsed={false} onToggle={() => undefined} showToggle={false} /></div>}
+          </div>
+        )}
+        <div className="lb-paper" style={{ '--z': zoom.percent / 100 } as CSSProperties}>
           {scenes.map((s, idx) => {
             const num = s.display_number
             const numEl = <span className={'lb-sd-num' + (num === null ? ' is-draft' : '')} title={num === null ? 'Not numbered until the script is locked' : `Scene ${num}`}>{num ?? idx + 1}</span>
@@ -467,7 +477,7 @@ export default function Script() {
                 {can ? (
                   t && t.elements.length ? <Screenplay elements={t.elements} /> : <p className="lb-caption lb-sd-body">{texts.isLoading ? 'Loading' : 'No text yet.'}</p>
                 ) : (
-                  <p className="lb-caption lb-sd-body"><Icon name="lock" /> This scene's text is not shared with you. You can see its heading. The owner decides who reads each scene.</p>
+                  <p className="lb-sd-body lb-rolock"><Icon name="lock" /><span className="lb-sr">This scene's text is not shared with you.</span></p>
                 )}
                 <div className="lb-sd-end">
                   {canEdit && !writing && (
@@ -481,15 +491,10 @@ export default function Script() {
             )
           })}
         </div>
+        </>
       )}
       </div>
       </div>
-      {sheetOpen && (
-        <Dialog title="Scenes" onClose={() => setSheetOpen(false)}>
-          <SceneNav {...navProps} collapsed={false} onToggle={() => undefined} showToggle={false} />
-          <div className="lb-actions"><button className="lb-btn" onClick={() => setSheetOpen(false)}>Close</button></div>
-        </Dialog>
-      )}
       {lockDialog && (
         <Dialog title={locked ? 'Unlock the script?' : 'Lock the script?'} onClose={() => setLockDialog(false)} badge={<Badge kind={locked ? 'conflict' : 'locked'}>{locked ? 'Numbers can be fixed again' : 'Numbers freeze'}</Badge>}>
           {locked
@@ -523,6 +528,17 @@ export default function Script() {
             <button className="lb-btn lb-btn--primary" disabled={revAct.busy} onClick={startNextRevision}>Start {revisionLabel(b.project.revision_no + 1)} revision</button>
           </div>
         </Dialog>
+      )}
+      {scenes.length > 0 && (
+        <div className="lb-zoom" role="group" aria-label="Zoom the script">
+          <button type="button" className="lb-zoom-btn" onClick={() => zoom.step(-1)} disabled={zoom.percent <= 50} aria-label="Zoom out" title="Zoom out (Ctrl or Cmd and minus)">&minus;</button>
+          <select className="lb-zoom-sel" aria-label="Zoom level" value={zoom.value === 'fit' ? 'fit' : String(zoom.value)} onChange={(e) => zoom.setValue(e.target.value === 'fit' ? 'fit' : Number(e.target.value))}>
+            {zoom.value !== 'fit' && !(ZOOM_STEPS as readonly number[]).includes(zoom.value) && <option value={String(zoom.value)}>{zoom.value}%</option>}
+            {ZOOM_STEPS.map((z) => <option key={z} value={String(z)}>{z}%</option>)}
+            <option value="fit">Fit width ({zoom.percent}%)</option>
+          </select>
+          <button type="button" className="lb-zoom-btn" onClick={() => zoom.step(1)} disabled={zoom.percent >= 200} aria-label="Zoom in" title="Zoom in (Ctrl or Cmd and plus)">+</button>
+        </div>
       )}
     </>
   )

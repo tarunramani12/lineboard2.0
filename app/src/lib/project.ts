@@ -15,6 +15,7 @@ export interface Bundle {
   memberTeams: MemberTeam[]
   me: Member
   myLinks: MemberTeam[]
+  myGrants: { section: SectionKey; level: 'view' | 'edit' }[]   // pages this person was given personally after asking for them
 }
 
 export async function fetchBundle(pid: string, uid: string): Promise<Bundle> {
@@ -51,9 +52,11 @@ export async function fetchBundle(pid: string, uid: string): Promise<Bundle> {
   const me = members.find((x) => x.account_id === uid)
   if (!me) throw new Error('You are not on this project.')
   const memberTeams = mt.data as MemberTeam[]
+  const gr = await supabase.from('member_section_grants').select('section, level').eq('member_id', me.id)
+  const myGrants = gr.error ? [] : (gr.data ?? []).map((x) => ({ section: x.section as SectionKey, level: (x.level === 'edit' ? 'edit' : 'view') as 'view' | 'edit' }))
   return {
     project: p.data as Project, teams, access: a.data as TeamAccess[], people, memberTeams, me,
-    myLinks: memberTeams.filter((x) => x.member_id === me.id),
+    myLinks: memberTeams.filter((x) => x.member_id === me.id), myGrants,
   }
 }
 
@@ -112,7 +115,14 @@ export function levelFor(b: Bundle, key: SectionKey): AccessLevel {
     if (row.level === 'edit' && (link.is_hod || link.can_edit)) return 'edit'
     best = 'view'
   }
-  return best
+  const g = b.myGrants.find((x) => x.section === key)
+  if (g?.level === 'edit') return 'edit'
+  return best === 'none' && g ? 'view' : best
+}
+
+/** A personal write grant covers rows of the person's own teams (the same rule the database uses). */
+export function hasEditGrantFor(b: Bundle, key: SectionKey, teamId: string): boolean {
+  return b.myGrants.some((g) => g.section === key && g.level === 'edit') && b.myLinks.some((l) => l.team_id === teamId)
 }
 
 export function myTeamNames(b: Bundle): string {
@@ -121,7 +131,7 @@ export function myTeamNames(b: Bundle): string {
 }
 
 export function roleLabel(b: Bundle): string {
-  if (b.me.role === 'owner') return 'Owner'
+  if (b.me.role === 'owner') return 'Admin'
   if (b.me.role === 'admin') return 'Admin'
   return isAnyHod(b) ? 'HOD' : 'Member'
 }

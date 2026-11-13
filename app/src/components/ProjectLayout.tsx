@@ -7,6 +7,7 @@ import {
 } from '../lib/project'
 import { SECTIONS, type SectionDef } from '../lib/sections'
 import { usePendingJoinRequests } from '../lib/joinRequests'
+import { useAccessRequests } from '../lib/accessRequests'
 import { Banner, EmptyState, Icon, Wordmark, useOnline } from './ui'
 
 export interface Ctx { b: Bundle; pid: string; uid: string }
@@ -15,17 +16,18 @@ export interface Ctx { b: Bundle; pid: string; uid: string }
 export function navState(b: Bundle, s: SectionDef): { locked: boolean; tag: string | null } {
   if (s.key) {
     const l = levelFor(b, s.key)
-    return { locked: l === 'none', tag: l === 'view' ? 'VIEW' : null }
+    if (s.key === 'cast_crew') return { locked: false, tag: null }   // everyone can open it: with no access they see only their own row
+    return { locked: l === 'none', tag: null }   // no VIEW tag: the app does not announce what kind of access a person has
   }
   if (s.fixed === 'team') {
     if (isOwnerOrAdmin(b)) return { locked: false, tag: null }
-    return hodTeamIds(b).length ? { locked: false, tag: 'OWN TEAM' } : { locked: true, tag: null }
+    return hodTeamIds(b).length ? { locked: false, tag: null } : { locked: true, tag: null }
   }
   return { locked: false, tag: null }
 }
 
 /** Short names for the phone bar, where each item is narrow. */
-const DOCK_NAME: Record<string, string> = { '': 'Overview', script: 'Script', shots: 'Shots', storyboard: 'Boards', breakdown: 'Breakdown', cast: 'Cast', props: 'Props', equipment: 'Gear', schedule: 'Schedule', callsheets: 'Call sheets', team: 'Team', export: 'Settings' }
+const DOCK_NAME: Record<string, string> = { '': 'Overview', script: 'Script', shots: 'Shots', storyboard: 'Boards', bible: 'Bible', breakdown: 'Breakdown', cast: 'Cast', props: 'Props', equipment: 'Gear', schedule: 'Schedule', callsheets: 'Call sheets', team: 'Team', export: 'Settings' }
 
 /** Phone only: one row along the bottom that swipes sideways. The current section scrolls into view. */
 function SectionDock({ b, pid, pending }: { b: Bundle; pid: string; pending: number }) {
@@ -40,7 +42,7 @@ function SectionDock({ b, pid, pending }: { b: Bundle; pid: string; pending: num
   }, [loc.pathname])
   return (
     <nav className="lb-dock" aria-label="Project sections" ref={ref}>
-      {SECTIONS.map((s) => {
+      {SECTIONS.filter((s) => !navState(b, s).locked).map((s) => {   // a section the person has no access to is not listed at all
         const st = navState(b, s)
         return (
           <NavLink key={s.path} to={`/p/${pid}${s.path ? '/' + s.path : ''}`} end={s.path === ''} title={s.label}
@@ -49,7 +51,7 @@ function SectionDock({ b, pid, pending }: { b: Bundle; pid: string; pending: num
             <span className="lb-dock-name" aria-hidden="true">{DOCK_NAME[s.path] ?? s.label}</span>
             <span className="lb-sr">{s.label}{st.locked ? ', no access' : st.tag ? `, ${st.tag.toLowerCase()}` : ''}</span>
             {st.locked && <span className="lb-dock-lock" aria-hidden="true"><Icon name="lock" /></span>}
-            {s.fixed === 'team' && pending > 0 && <span className="lb-dock-count"><span aria-hidden="true">{pending}</span><span className="lb-sr">, {pending} {pending === 1 ? 'request' : 'requests'} to join</span></span>}
+            {s.fixed === 'team' && pending > 0 && <span className="lb-dock-count"><span aria-hidden="true">{pending}</span><span className="lb-sr">, {pending} {pending === 1 ? 'request' : 'requests'} waiting</span></span>}
           </NavLink>
         )
       })}
@@ -69,14 +71,14 @@ function SectionNav({ b, pid, pending, onGo, hidden, onToggle }: { b: Bundle; pi
         )}
         <div className="lb-label">{myTeamNames(b)} · {roleLabel(b)}</div>
       </div>
-      {SECTIONS.map((s) => {
+      {SECTIONS.filter((s) => !navState(b, s).locked).map((s) => {   // a section the person has no access to is not listed at all
         const st = navState(b, s)
         return (
           <NavLink key={s.path} to={`/p/${pid}${s.path ? '/' + s.path : ''}`} end={s.path === ''} onClick={onGo} title={s.label}
             className={st.locked ? 'is-locked' : undefined}>
             <span className="lb-navico"><Icon name={s.icon as never} /></span>
             <span className="lb-navtxt">{s.label}</span>
-            <span className="lb-tag">
+            <span className={'lb-tag' + (!st.locked && s.fixed === 'team' && pending > 0 ? ' lb-tag--new' : '')}>
               {st.locked ? <><Icon name="lock" /><span style={{ position: 'absolute', left: -9999 }}>No access</span></> : s.fixed === 'team' && pending > 0 ? `${pending} NEW` : st.tag}
             </span>
           </NavLink>
@@ -123,7 +125,9 @@ export default function ProjectLayout() {
   })
   const loc = useLocation()
   const canDecide = q.data ? isOwnerOrAdmin(q.data) || hodTeamIds(q.data).length > 0 : false
-  const pending = usePendingJoinRequests(pid, canDecide).data?.length ?? 0
+  const joinPending = usePendingJoinRequests(pid, canDecide).data?.length ?? 0
+  const accessPending = (useAccessRequests(pid, canDecide).data ?? []).filter((r) => r.status === 'pending' && r.member_id !== q.data?.me.id).length
+  const pending = joinPending + accessPending   // everything waiting for this person to decide
 
   if (q.isLoading) return <main className="lb-account"><p className="lb-caption">Loading project</p></main>
   if (q.isError || !q.data) {

@@ -61,7 +61,7 @@ export function canEditItemFor(b: Bundle, kind: ItemKind, teamId: string): boole
 }
 export const teamsIEditItems = (b: Bundle, kind: ItemKind): Team[] => b.teams.filter((t) => canEditItemFor(b, kind, t.id))
 /** Cost is for the owner, admins and the Production team. */
-export const canSeeCosts = (b: Bundle) => isOwnerOrAdmin(b) || b.myLinks.some((l) => b.teams.find((t) => t.id === l.team_id)?.name === 'Production')
+export const canSeeCosts = (b: Bundle) => isOwnerOrAdmin(b) || b.myLinks.some((l) => b.teams.find((t) => t.id === l.team_id)?.role_tag === 'production')
 
 export interface Suggestion { key: string; name: string; quantity: number; team_id: string; sceneIds: string[] }
 /**

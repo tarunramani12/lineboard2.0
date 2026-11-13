@@ -436,7 +436,7 @@ export default function SchedulePage() {
   return (
     <>
       {head}
-      <p className="lb-caption">A schedule is a block of shoot days. A shoot day is made for every date in the schedule. Put each scene on the day it will be shot. Open a scene's shots to send some of them to a different day. Delete the days you will not shoot. Production and the AD team edit it by default. The admin can change that in Team and access.</p>
+      <p className="lb-caption lb-phone-hide">A schedule is a block of shoot days. A shoot day is made for every date in the schedule. Put each scene on the day it will be shot. Open a scene's shots to send some of them to a different day. Delete the days you will not shoot. Production and the AD team edit it by default. The admin can change that in Team and access.</p>
       {error && <p className="lb-error" role="alert">{error}</p>}
       <div className="lb-row">
         {schedules.length > 1 && (

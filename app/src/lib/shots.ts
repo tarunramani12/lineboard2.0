@@ -74,7 +74,7 @@ export function canChangeStatus(b: Bundle): boolean {
 }
 /** Can this person edit shots as the team with this name (VFX, Sound)? */
 export function canEditShotsAs(b: Bundle, teamName: string): boolean {
-  const t = b.teams.find((x) => x.name === teamName)
+  const t = b.teams.find((x) => x.role_tag === teamName.toLowerCase())
   return Boolean(t) && canEditShotsFor(b, t!.id)
 }
 

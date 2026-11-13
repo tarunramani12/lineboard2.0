@@ -315,7 +315,7 @@ export default function Bible() {
         <EmptyState title="The Project bible is not open to your team">The admin can change this in Team and access.</EmptyState>
       ) : (
         <>
-          <p className="lb-caption">The shape, speed and look of the film in one place. The Camera team manages the format and the Direction team manages the moodboard, unless the admin hands a part to another team.</p>
+          <p className="lb-caption lb-phone-hide">The shape, speed and look of the film in one place. The Camera team manages the format and the Direction team manages the moodboard, unless the admin hands a part to another team.</p>
           <div className="lb-seg" role="group" aria-label="Project bible">
             <button type="button" aria-pressed={tab === 'format'} onClick={() => setTab('format')}>Format</button>
             <button type="button" aria-pressed={tab === 'mood'} onClick={() => setTab('mood')}>Moodboard</button>

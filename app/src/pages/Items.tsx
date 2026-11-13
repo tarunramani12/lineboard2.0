@@ -209,7 +209,7 @@ export default function ItemsPage({ kind }: { kind: ItemKind }) {
   const categories = useMemo(() => [...info.categories, ...new Set(all.map((i) => i.category).filter((c) => c && !info.categories.includes(c)))], [info.categories, all])
   const suppliers = useMemo(() => [...new Set(all.map((i) => i.supplier).filter(Boolean))].sort((a, z) => a.localeCompare(z)), [all])
   const own = mine.find((t) => b.myLinks.some((l) => l.team_id === t.id))
-  const defaultTeam = (own ?? mine.find((t) => t.name === (kind === 'prop' ? 'Art' : 'Camera')) ?? mine[0])?.id ?? ''
+  const defaultTeam = (own ?? mine.find((t) => t.role_tag === (kind === 'prop' ? 'art' : 'camera')) ?? mine[0])?.id ?? ''
   const teamName = (id: string) => b.teams.find((t) => t.id === id)?.name ?? 'No team'
 
   const head = (
@@ -266,7 +266,7 @@ export default function ItemsPage({ kind }: { kind: ItemKind }) {
   return (
     <>
       {head}
-      <p className="lb-caption">{kind === 'equipment'
+      <p className="lb-caption lb-phone-hide">{kind === 'equipment'
         ? 'One equipment list for each schedule. Each team lists its own equipment and sees only its own. The head of department edits it. Cost is visible only to the admins and the Production team.'
         : 'One prop list for each schedule. Each team adds its own and only that team edits it. Cost is visible only to the admins and the Production team.'}</p>
       {error && <p className="lb-error" role="alert">{error}</p>}
@@ -346,10 +346,10 @@ export default function ItemsPage({ kind }: { kind: ItemKind }) {
                       {i.name}
                     </button>
                     <span className="lb-shotcell">{i.quantity}</span>
-                    <span className="lb-shotcell">{i.category || <span className="lb-muted">–</span>}</span>
+                    <span className="lb-shotcell">{i.category || <span className="lb-muted lb-dash">–</span>}</span>
                     <span className="lb-shotcell"><Badge kind={i.status === 'ready' || i.status === 'returned' ? 'plain' : i.status === 'confirmed' ? 'revised' : 'stale'}>{STATUS_LABEL[i.status]}</Badge></span>
-                    <span className="lb-shotcell">{i.supplier || <span className="lb-muted">–</span>}</span>
-                    {seeCost && <span className="lb-shotcell">{c ? formatMoney(c.amount, c.currency) : <span className="lb-muted">–</span>}</span>}
+                    <span className="lb-shotcell">{i.supplier || <span className="lb-muted lb-dash">–</span>}</span>
+                    {seeCost && <span className="lb-shotcell">{c ? formatMoney(c.amount, c.currency) : <span className="lb-muted lb-dash">–</span>}</span>}
                     <span className="lb-cclock">{!editable && <span className="lb-rolock" title="Managed by another team"><Icon name="lock" /><span className="lb-sr">Read only</span></span>}</span>
                   </div>
                   </SwipeRow>

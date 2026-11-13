@@ -117,7 +117,7 @@ export function ExportSettings() {
       <RequestAccessCard b={b} pid={pid} />
       <section className="lb-card lb-stack" aria-label="PDFs and files">
         <h2 className="lb-heading">PDFs for each department</h2>
-        <p className="lb-caption">Each department downloads its own file from its own page, with the paper size you choose. You only see the pages you have access to. A lock means your team cannot open that page.</p>
+        <p className="lb-caption lb-phone-hide">Each department downloads its own file from its own page, with the paper size you choose. You only see the pages you have access to. A lock means your team cannot open that page.</p>
         <ul className="lb-unlist">
           {([['script', 'Script (screenplay layout, scene numbers)', 'script', 'script'], ['shots', 'Shot list', 'shots', 'shots'], ['storyboard', 'Storyboard pictures', 'storyboard', 'shots'], ['bible', 'Project bible', 'bible', 'bible'], ['breakdown', 'Breakdown', 'breakdown', 'breakdown'], ['cast', 'Cast and crew', 'cast', 'cast_crew'], ['props', 'Props, one per schedule', 'props', 'props'], ['equipment', 'Equipment, one per schedule', 'equipment', 'equipment'], ['schedule', 'Schedule', 'schedule', 'schedule'], ['callsheets', 'Call sheets, one per shoot day', 'callsheets', 'call_sheets']] as const).map(([path, label, , key]) => {
             const open = levelFor(b, key) !== 'none'

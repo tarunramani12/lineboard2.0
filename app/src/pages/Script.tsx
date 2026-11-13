@@ -17,6 +17,7 @@ import {
 import { SECTIONS } from '../lib/sections'
 import { supabase } from '../lib/supabase'
 import { useScriptZoom, ZOOM_STEPS } from '../lib/zoom'
+import { canEditBibleArea, useBibleFormat } from '../lib/bible'
 import type { Scene } from '../lib/types'
 import type { CSSProperties } from 'react'
 
@@ -245,6 +246,21 @@ export default function Script() {
   const canEdit = level === 'edit'
   const locked = b.project.script_locked
   const zoom = useScriptZoom()
+  const bibleQ = useBibleFormat(pid, true)   // the target runtime lives in the Project bible; people who cannot read it simply get nothing back
+  const [runtimeDlg, setRuntimeDlg] = useState(false)
+  const [runtimeDraft, setRuntimeDraft] = useState('')
+  const runtimeAct = useAction()
+  const runtime = bibleQ.data?.runtime_target ?? ''
+  const canSetRuntime = canEditBibleArea(b, 'format')
+  async function saveRuntime() {
+    const ok = await runtimeAct.run(async () => {
+      const { error } = await supabase.from('project_bible').upsert({ project_id: pid, runtime_target: runtimeDraft.trim() }, { onConflict: 'project_id' })
+      if (error) throw error
+      await qc.invalidateQueries({ queryKey: ['bible', pid] })
+      return true
+    }, friendlyError)
+    if (ok) setRuntimeDlg(false)
+  }
   const def = SECTIONS.find((s) => s.path === 'script')!
   const st = navState(b, def)
   const [editing, setEditing] = useState<string | null>(null)
@@ -411,7 +427,7 @@ export default function Script() {
   return (
     <>
       {head}
-      <p className="lb-caption">Everyone on the project sees every scene heading. Action and dialogue show only for scenes shared with you. One person writes a scene at a time. Scenes get their numbers when the admin locks the script.</p>
+      <p className="lb-caption lb-phone-hide">Everyone on the project sees every scene heading. Action and dialogue show only for scenes shared with you. One person writes a scene at a time. Scenes get their numbers when the admin locks the script.</p>
       <div className="lb-row">
         {canEdit && !writing && <button className="lb-btn lb-btn--primary" onClick={() => startWriting(null)}><Icon name="plus" /> Write a scene</button>}
         {isOwner(b) && !writing && <Link className="lb-btn" to="import">{scenes.length ? 'Import a new draft' : 'Import a script'}</Link>}
@@ -419,6 +435,12 @@ export default function Script() {
         {canStartRevision && <button className="lb-btn" onClick={() => setNextRevDialog(true)}>Start next revision</button>}
         {isOwner(b) && <button className="lb-btn" onClick={() => { navAct.setError(null); setLockDialog(true) }}><Icon name="lock" /> {locked ? 'Unlock script' : 'Lock script'}</button>}
         {totalLines > 0 && <span className="lb-caption">{aboutPages(totalLines)} in the scenes you can read</span>}
+        {(runtime || canSetRuntime) && (
+          <span className="lb-caption lb-runtime">
+            {runtime ? <>Target runtime <b>{runtime}</b></> : 'No target runtime'}
+            {canSetRuntime && <button type="button" className="lb-btn lb-btn--sm lb-btn--quiet" onClick={() => { runtimeAct.setError(null); setRuntimeDraft(runtime); setRuntimeDlg(true) }}>{runtime ? 'Change' : 'Set'}</button>}
+          </span>
+        )}
       </div>
       {navAct.error && !lockDialog && <p className="lb-error" role="alert">{navAct.error}</p>}
       <div className={'lb-scriptlayout' + (phone || scenes.length === 0 ? ' is-single' : '') + (navCollapsed ? ' is-collapsed' : '')}>
@@ -495,6 +517,14 @@ export default function Script() {
       )}
       </div>
       </div>
+      {runtimeDlg && (
+        <Dialog title="Target runtime" onClose={() => setRuntimeDlg(false)}>
+          <p>How long the finished film should run, for example 12 minutes. It is kept in the Project bible and shown here next to the page estimate.</p>
+          <div className="lb-field"><label htmlFor="rt-in">Target runtime</label><input id="rt-in" className="lb-input" maxLength={60} value={runtimeDraft} onChange={(e) => setRuntimeDraft(e.target.value)} placeholder="12 minutes" /></div>
+          {runtimeAct.error && <p className="lb-error" role="alert">{runtimeAct.error}</p>}
+          <div className="lb-actions"><button className="lb-btn" onClick={() => setRuntimeDlg(false)}>Cancel</button><button className="lb-btn lb-btn--primary" disabled={runtimeAct.busy} onClick={saveRuntime}>{runtimeAct.busy ? 'Saving' : 'Save'}</button></div>
+        </Dialog>
+      )}
       {lockDialog && (
         <Dialog title={locked ? 'Unlock the script?' : 'Lock the script?'} onClose={() => setLockDialog(false)} badge={<Badge kind={locked ? 'conflict' : 'locked'}>{locked ? 'Numbers can be fixed again' : 'Numbers freeze'}</Badge>}>
           {locked

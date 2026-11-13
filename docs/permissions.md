@@ -22,4 +22,4 @@ Project bible format: Camera. Moodboard: Direction. A shot, storyboard frame, br
 | Project bible | owns moodboard | read | owns format | read |
 
 ## Under the hood
-Helpers every policy uses: `can_view_section`, `can_edit_section(pid, section, team)`, `is_owner_or_admin`, `can_manage_team`, `can_edit_bible_area`, `can_see_schedule_drafts`, `can_decide_access_for`. Known weak spot: a few rules find a team by its name (Production, VFX, Sound, Camera, Direction); renaming those teams breaks the rule.
+Helpers every policy uses: `can_view_section`, `can_edit_section(pid, section, team)`, `is_owner_or_admin`, `can_manage_team`, `can_edit_bible_area`, `can_see_schedule_drafts`, `can_decide_access_for`. Rules that single out a team (Production costs, VFX and Sound shot fields) use the team's role tag (`teams.role_tag`, set in Team and access under Works as), not its name, so teams can be renamed. The Project bible owners are stored on the project and changed by an Admin.

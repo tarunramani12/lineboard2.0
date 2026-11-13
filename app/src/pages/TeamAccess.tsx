@@ -260,6 +260,7 @@ function AdToggle({ team, pid }: { team: Team; pid: string }) {
   const refresh = useRefresh(pid)
   const act = useAction()
   return (
+    <>
     <div className="lb-row">
       <button className="lb-btn lb-btn--sm" disabled={act.busy} onClick={() => act.run(async () => {
         const { error } = await supabase.from('teams').update({ is_ad_team: !team.is_ad_team }).eq('id', team.id)
@@ -269,6 +270,25 @@ function AdToggle({ team, pid }: { team: Team; pid: string }) {
       <span className="lb-caption">The AD team publishes call sheets and changes shot status, through the people its head of department gives edit access.</span>
       {act.error && <span className="lb-error" role="alert">{act.error}</span>}
     </div>
+    <div className="lb-row">
+      <label className="lb-row" htmlFor={`rt-${team.id}`}>Works as
+        <select id={`rt-${team.id}`} className="lb-input" style={{ width: 'auto' }} value={team.role_tag ?? ''} disabled={act.busy} onChange={(e) => act.run(async () => {
+          const { error } = await supabase.from('teams').update({ role_tag: e.target.value || null }).eq('id', team.id)
+          if (error) throw error
+          refresh()
+        }, friendlyError)}>
+          <option value="">No special role</option>
+          <option value="production">Production (sees costs)</option>
+          <option value="camera">Camera (owns the format by default)</option>
+          <option value="direction">Direction</option>
+          <option value="art">Art (default for props)</option>
+          <option value="vfx">VFX (edits VFX required)</option>
+          <option value="sound">Sound (edits sound effects required)</option>
+        </select>
+      </label>
+      <span className="lb-caption">Rules follow this role, not the team name, so you can rename the team.</span>
+    </div>
+    </>
   )
 }
 

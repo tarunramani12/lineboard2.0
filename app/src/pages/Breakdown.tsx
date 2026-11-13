@@ -283,7 +283,7 @@ export default function Breakdown() {
         <ReportButton label="Download breakdown PDF" file={fileSafe(b.project.name) + '-breakdown'} disabled={scenes.length === 0}
           build={(size) => buildReportPdf(breakdownReport({ project: b.project.name, size, scenes, items: q.data?.items ?? [], forms: q.data?.forms ?? new Map(), teams: b.teams }))} />
       </div>
-      <p className="lb-caption">One form for each scene: where and when it happens, and everything it needs, by department. Each element belongs to the team that added it, and only that team edits it. Quantities of equipment at 0 are listed but not counted.</p>
+      <p className="lb-caption lb-phone-hide">One form for each scene: where and when it happens, and everything it needs, by department. Each element belongs to the team that added it, and only that team edits it. Quantities of equipment at 0 are listed but not counted.</p>
       {scenes.length > 0 && (
         <div className="lb-row">
           <label className="lb-row" htmlFor="bd-filter">Show scenes tagged by

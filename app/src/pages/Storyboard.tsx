@@ -408,7 +408,7 @@ export default function Storyboard() {
   return (
     <>
       {head}
-      <p className="lb-caption">One frame for each shot. Add up to {MAX_LAYERS} photos, draw over them, and mark the frame done to flatten it into one picture. Frames belong to the shot's team.</p>
+      <p className="lb-caption lb-phone-hide">One frame for each shot. Add up to {MAX_LAYERS} photos, draw over them, and mark the frame done to flatten it into one picture. Frames belong to the shot's team.</p>
       {!online && <Banner lead="Offline">Frames are blank without a connection. Export the storyboard as a PDF before you go somewhere with no signal.</Banner>}
       <div className="lb-row">
         <span className="lb-caption"><b>{mb(used)} MB</b> of {capMb} MB used</span>

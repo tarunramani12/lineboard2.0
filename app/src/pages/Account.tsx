@@ -191,10 +191,12 @@ export function AccountBar({ back }: { back?: boolean }) {
     <>
       <header className="lb-topbar">
         <span className="lb-stripes" aria-hidden="true" />
+        {back && <Link to="/" className="lb-topback lb-phone-only" aria-label="All projects"><Icon name="chev" /></Link>}
         <Link to="/" style={{ textDecoration: 'none' }} aria-label="LineBoard, all projects"><Wordmark onDark /></Link>
         <div className="lb-grow" />
-        {back && <Link to="/" className="lb-btn lb-btn--sm">All projects</Link>}
-        <Link to="/settings" className="lb-btn lb-btn--sm">{user?.email ?? 'Account'}</Link>
+        {back && <Link to="/" className="lb-btn lb-btn--sm lb-phone-hide">All projects</Link>}
+        <Link to="/settings" className="lb-btn lb-btn--sm lb-phone-hide">{user?.email ?? 'Account'}</Link>
+        <Link to="/settings" className="lb-avatar lb-phone-only" aria-label="Account">{(user?.email ?? '?').charAt(0).toUpperCase()}</Link>
       </header>
       {!online && <Banner kind="quiet" lead="Offline">You can read what you opened before. Editing needs a connection.</Banner>}
     </>

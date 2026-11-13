@@ -404,7 +404,7 @@ export default function ShotList() {
                     <span className="lb-caption lb-shotcount">{list.length} {list.length === 1 ? 'shot' : 'shots'}</span>
                   </button>
                   {sc.revised_in ? <Badge kind="conflict" ><Icon name="warn" /> Scene revised ({revisionLabel(sc.revised_in)}). Check these shots.</Badge> : null}
-                  {canAdd && !omitted && <button className="lb-btn lb-btn--sm" onClick={() => setDlg({ shotId: null, sceneId: sc.id, after: null })}><Icon name="plus" /> Add shot</button>}
+                  {canAdd && !omitted && <button className="lb-btn lb-btn--sm lb-addshot" aria-label="Add shot" onClick={() => setDlg({ shotId: null, sceneId: sc.id, after: null })}><Icon name="plus" /> <span className="lb-addshot-txt">Add shot</span></button>}
                 </header>
                 {fold.isOpen(sc.id) && (
                 <>

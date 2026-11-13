@@ -209,7 +209,7 @@ export default function CastCrew() {
   async function detect() {
     // The team that will manage the new rows: your own team if it can edit here, else Production, else the first team you can edit for.
     const own = mine.find((t) => b.myLinks.some((l) => l.team_id === t.id))
-    const team = own ?? mine.find((t) => t.name === 'Production') ?? mine[0]
+    const team = own ?? mine.find((t) => t.role_tag === 'production') ?? mine[0]
     if (!team) return
     setError(null); setNote(null)
     const { data, error: e } = await supabase.rpc('detect_cast', { pid, for_team: team.id })
@@ -224,7 +224,7 @@ export default function CastCrew() {
   return (
     <>
       {head}
-      <p className="lb-caption">One list for the whole project. Names, roles and call times are visible to everyone who can see this page. Phone and email are visible only to the admins and the AD team. Each row is managed by one team, and only that team edits it.</p>
+      <p className="lb-caption lb-phone-hide">One list for the whole project. Names, roles and call times are visible to everyone who can see this page. Phone and email are visible only to the admins and the AD team. Each row is managed by one team, and only that team edits it.</p>
       <div className="lb-row">
         <div className="lb-seg" role="group" aria-label="Show">
           {([['all', `All ${rows.length}`], ['cast', `Cast ${counts.cast}`], ['crew', `Crew ${counts.crew}`]] as const).map(([k, l]) => (
@@ -264,11 +264,11 @@ export default function CastCrew() {
                   {r.auto && <Badge kind="plain">Script</Badge>}
                   {r.account_id && <Badge kind="plain">Account</Badge>}
                 </button>
-                <span className="lb-shotcell">{r.kind === 'cast' ? <><span className="lb-muted">as </span>{r.role}</> : r.role || <span className="lb-muted">–</span>}</span>
-                <span className="lb-shotcell">{r.kind === 'cast' ? <span className="lb-muted">Cast</span> : r.department || <span className="lb-muted">–</span>}</span>
-                <span className="lb-shotcell">{r.call_time || <span className="lb-muted">–</span>}</span>
-                <span className="lb-shotcell">{r.makeup_time || <span className="lb-muted">–</span>}</span>
-                {seeContacts && <span className="lb-shotcell">{c && (c.phone || c.email) ? <>{c.phone}{c.phone && c.email ? ' · ' : ''}{c.email}</> : <span className="lb-muted">–</span>}</span>}
+                <span className="lb-shotcell">{r.kind === 'cast' ? <><span className="lb-muted">as </span>{r.role}</> : r.role || <span className="lb-muted lb-dash">–</span>}</span>
+                <span className="lb-shotcell">{r.kind === 'cast' ? <span className="lb-muted lb-dash">Cast</span> : r.department || <span className="lb-muted lb-dash">–</span>}</span>
+                <span className="lb-shotcell">{r.call_time || <span className="lb-muted lb-dash">–</span>}</span>
+                <span className="lb-shotcell">{r.makeup_time || <span className="lb-muted lb-dash">–</span>}</span>
+                {seeContacts && <span className="lb-shotcell">{c && (c.phone || c.email) ? <>{c.phone}{c.phone && c.email ? ' · ' : ''}{c.email}</> : <span className="lb-muted lb-dash">–</span>}</span>}
                 <span className="lb-cclock">{!editable && <span className="lb-rolock" title="Managed by another team"><Icon name="lock" /><span className="lb-sr">Read only</span></span>}</span>
               </div>
               </SwipeRow>

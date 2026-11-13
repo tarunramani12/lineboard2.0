@@ -111,7 +111,7 @@ export default function CallSheetsPage() {
     return (
       <>
         {head}
-        <p className="lb-caption">One call sheet for each shoot day. Production and the AD team write and publish it. Everyone with access to Call sheets reads the published version.</p>
+        <p className="lb-caption lb-phone-hide">One call sheet for each shoot day. Production and the AD team write and publish it. Everyone with access to Call sheets reads the published version.</p>
         {!b.project.script_locked && editor && <Banner lead="The script is not locked.">Scene numbers can still change. Lock the script before you publish, so the sheet and the scenes agree.</Banner>}
         {schedules.length > 1 && (
           <div className="lb-row"><select className="lb-input" style={{ width: 'auto' }} aria-label="Schedule" value={current?.id ?? ''} onChange={(e) => choose(e.target.value)}>{schedules.map((s) => <option key={s.id} value={s.id}>{s.name}</option>)}</select></div>

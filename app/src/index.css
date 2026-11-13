@@ -811,3 +811,80 @@ body { -webkit-text-size-adjust: 100%; text-size-adjust: 100%; }
 /* a row you cannot change: just a small padlock (screen readers still hear "Read only") */
 .lb-rolock { display: inline-flex; align-items: center; color: var(--ink-muted); }
 .lb-rolock .lb-icon { width: 16px; height: 16px; }
+
+/* =====================================================================================================================
+   Phone, app style (2026-11-13): slim top bar with a back arrow and an account circle, one-line list rows, tidy button
+   grids, no long intro text. Under 640px only; tablets and desktops are untouched.
+   ===================================================================================================================== */
+.lb-phone-only { display: none; }
+.lb-addshot-txt { display: inline; }
+@media (max-width: 639px) {
+  .lb-topbar .lb-phone-hide, .lb-topbar .lb-btn.lb-phone-hide { display: none; }
+  .lb-phone-only { display: inline-flex; }
+
+  /* top bar: [back] title ... [account] */
+  .lb-topbar { flex-wrap: nowrap; justify-content: flex-start; align-items: center; min-height: 52px; padding: 0 8px 0 4px; padding-top: env(safe-area-inset-top); gap: 4px; }
+  .lb-topbar .lb-stripes { display: none; }
+  .lb-topbar .lb-grow { order: 0; flex: 1 1 auto; min-width: 0; padding: 0 4px; }
+  .lb-topbar .lb-body-strong { font-size: 19px; letter-spacing: .05em; }
+  .lb-topbar > a:has(.lb-brand) { padding-left: 8px; }
+  .lb-topback, .lb-avatar { align-items: center; justify-content: center; flex-shrink: 0; width: 44px; height: 44px; box-sizing: border-box; text-decoration: none; }
+  .lb-topback { border-radius: var(--radius-md); }
+  .lb-topback .lb-icon { width: 26px; height: 26px; transform: rotate(180deg); }
+  .lb-avatar { border-radius: 50%; width: 38px; height: 38px; margin: 3px 3px 3px 0; background: color-mix(in srgb, var(--ink) 78%, var(--on-ink)); color: var(--on-ink); font-family: var(--font-display); font-weight: 600; font-size: 18px; line-height: 1; }
+  .lb-topbar a.lb-avatar { color: var(--on-ink); }
+
+  /* page head: title and badge on one line, no wasted space */
+  .lb-layout { padding: 10px 12px 96px; gap: 10px; }
+  .lb-content { gap: 10px; }
+  .lb-page-head { flex-wrap: nowrap; gap: 8px; min-height: 36px; }
+  .lb-page-head .lb-title { font-size: 24px; min-width: 0; }
+  .lb-page-head .lb-row, .lb-page-head > .lb-badge { flex-shrink: 0; }
+  .lb-content p:not([class]) { font-size: 15px; line-height: 1.45; }
+  .lb-account { padding: 12px; gap: 12px; }
+
+  /* rows of buttons and filters: a tidy grid, buttons side by side, the odd one fills the line */
+  .lb-content > .lb-row { display: flex; flex-wrap: wrap; align-items: stretch; gap: 8px; justify-content: flex-start; }
+  .lb-content > .lb-row > .lb-btn, .lb-content > .lb-row > a.lb-btn { flex: 1 1 calc(50% - 4px); justify-content: center; text-align: center; }
+  .lb-content > .lb-row > .lb-row { flex: 1 1 calc(50% - 4px); }
+  .lb-content > .lb-row > .lb-row > .lb-btn { width: 100%; justify-content: center; }
+  .lb-content > .lb-row > select { flex: 1 1 calc(50% - 4px); min-width: 0; }
+  .lb-content > .lb-row > .lb-seg, .lb-content > .lb-row > label, .lb-content > .lb-row > .lb-caption, .lb-content > .lb-row > .lb-meter { flex: 1 1 100%; width: 100% !important; max-width: none !important; box-sizing: border-box; }
+  .lb-content > .lb-row > .lb-seg { display: flex; }
+  .lb-content > .lb-row > .lb-seg > button { flex: 1; }
+  .lb-content > .lb-row > .lb-grow, .lb-content > .lb-row > span[style*="flex: 1"] { display: none; }
+  .lb-content > .lb-row > .lb-badge { align-self: center; }
+  .lb-seg { display: flex; width: 100%; box-sizing: border-box; }
+  .lb-seg > button, .lb-seg > a { flex: 1; justify-content: center; }
+  .lb-actions { justify-content: stretch; }
+  .lb-actions > .lb-btn { flex: 1 1 calc(50% - 4px); justify-content: center; }
+
+  /* alert strips stack: text, then its button full width */
+  .lb-banner { flex-direction: column; align-items: stretch; gap: 8px; padding: 10px 12px; font-size: 14px; }
+  .lb-banner .lb-btn { width: 100%; justify-content: center; }
+
+  /* cards are flat sheets with a little less padding */
+  .lb-card { border-radius: var(--radius-lg); }
+  .lb-cards > .lb-card { padding: 12px; }
+  .lb-cards > .lb-card .lb-label { font-size: 12px; }
+  .lb-cards > .lb-card .lb-heading { font-size: 17px; }
+  .lb-cards > .lb-card .lb-caption { font-size: 12px; }
+  .lb-cards > .lb-card:nth-child(n+4):last-child:nth-child(even) { grid-column: auto; }
+
+  /* people and equipment rows: name and lock on the first line, small details underneath in a muted line */
+  .lb-ccrow, .lb-itrow, .lb-itrow.has-cost { display: flex; flex-wrap: wrap; align-items: center; column-gap: 10px; row-gap: 0; padding: 8px 12px; }
+  .lb-ccrow > :first-child, .lb-itrow > :first-child { order: 1; flex: 1 1 calc(100% - 34px); min-width: 0; font-weight: 700; font-size: 16px; }
+  .lb-ccrow > .lb-cclock, .lb-itrow > .lb-cclock { order: 2; flex: 0 0 24px; }
+  .lb-ccrow > .lb-shotcell, .lb-itrow > :nth-child(n+2):not(.lb-cclock) { order: 3; flex: 0 0 auto; font-size: 13px; color: var(--ink-muted); }
+  .lb-ccrow > .lb-shotcell:has(> .lb-dash), .lb-itrow > :nth-child(n+2):not(.lb-cclock):has(> .lb-dash) { display: none; }
+  .lb-cchead, .lb-ithead { display: none; }
+  .lb-itrow > :nth-child(2)::before { content: "\00d7\00a0"; }
+
+  /* list rows give a clear 56px tap row */
+  .lb-bdrow { padding-top: 10px; padding-bottom: 10px; }
+
+  /* one-line scene headings with an icon-only add button */
+  .lb-addshot { width: 44px; padding: 0; justify-content: center; }
+  .lb-addshot-txt { display: none; }
+}
+.lb-runtime { display: inline-flex; align-items: center; gap: 8px; flex-wrap: wrap; }

@@ -149,7 +149,8 @@ export default function ProjectLayout() {
     <>
       <header className="lb-topbar">
         <span className="lb-stripes" aria-hidden="true" />
-        <div>
+        <Link to="/" className="lb-topback lb-phone-only" aria-label="All projects"><Icon name="chev" /></Link>
+        <div className="lb-phone-hide">
           <Link to="/" style={{ textDecoration: 'none' }} aria-label="LineBoard, all projects"><Wordmark onDark /></Link>
         </div>
         <div className="lb-grow">
@@ -157,8 +158,9 @@ export default function ProjectLayout() {
           <div className="lb-crumb">{current.label} · {myTeamNames(b)} · {roleLabel(b)}</div>
         </div>
 
-        <Link to="/" className="lb-btn lb-btn--sm">Projects</Link>
-        <Link to="/settings" className="lb-btn lb-btn--sm">Account</Link>
+        <Link to="/" className="lb-btn lb-btn--sm lb-phone-hide">Projects</Link>
+        <Link to="/settings" className="lb-btn lb-btn--sm lb-phone-hide">Account</Link>
+        <Link to="/settings" className="lb-avatar lb-phone-only" aria-label="Account">{(user?.email ?? '?').charAt(0).toUpperCase()}</Link>
       </header>
       {!online && <Banner kind="quiet" lead="Offline">Read-only. Changes need a connection.</Banner>}
       <div className={'lb-layout' + (sideHidden ? ' is-side-hidden' : '')}>

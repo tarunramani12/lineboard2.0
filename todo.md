@@ -53,6 +53,21 @@ Built and browser-tested 2026-11-14: database (0038, 0039 applied), page, photos
 
 - [ ] Check on a real phone after deploy: Script page (Lock and Set target runtime in the hamburger menu, sticky Scenes button) and the Shot list fold button beside the info
 
+## Scene search (built and DEPLOYED 2026-11-15, not committed)
+- [x] Search on Shot list, Storyboard (floating button) and Script (a bar under the top bar: Scenes button, search, zoom pill at the far right) (`components/SceneFind.tsx`, `lib/sceneSearch.ts`): the cross clears and closes; matches scene number and heading, and on Script also the scene text (only scenes the person may read)
+- [ ] Owner: delete the leftover test row `lbfindtest@example.com` in `project_creators` (my cleanup SQL was declined; the test account and project were deleted)
+- [ ] Owner to look at it on a real phone and in dark mode (Chrome checks passed at 1280 and 390 wide)
+- [ ] Filter button next to the search (owner asked to keep this for later): INT / EXT, DAY / NIGHT, DAWN / DUSK from the heading (`headingParts()` in `lib/schedule.ts`), plus "Revised" on Script and "No shots yet" on Shot list and Storyboard; OR within a group, AND across groups, combined with the search; badge on the button shows how many are on
+
+## Design consistency fixes (from the 2026-11-15 audit; owner to choose which to do)
+- [ ] Use the shared `Dialog` in the seven pages that build their own modal (Breakdown, CastCrew, Items, Locations, Schedule, ShotList, Storyboard)
+- [ ] Replace hard-coded colours with tokens (`#fff`/`#000`, top bar greys, swipe delete red, pen colours); one red
+- [ ] Decide on the three fully round pills (`.lb-stag`, `.lb-chipx`, `.lb-chg`) and loose radii
+- [ ] Merge the duplicate CSS rule blocks (29 selectors defined twice or more)
+- [ ] `lb-title` on the sign-in and legal page headings; "Open Schedule" to "Open the Schedule"
+- [ ] Move repeated inline styles (CallSheets, TeamAccess, Schedule, Items) into classes
+- [ ] Cast and crew: check the Cast and Crew views on a phone and tablet after deploy (built 2026-11-15, not deployed)
+
 ## Later / waiting
 - [ ] Delete the unused `u6835386282@id.gle` Google account (myaccount.google.com, Data & privacy, Delete your Google Account). Owner, after the Gmail account exists.
 - [ ] Optionally shut down the old Google Cloud project `lineboard-514708` under the personal Google account (IAM and Admin, Settings, Shut down) once Google sign-in works.

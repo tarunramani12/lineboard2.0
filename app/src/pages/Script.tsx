@@ -4,6 +4,8 @@ import { useQueryClient } from '@tanstack/react-query'
 import { navState, type Ctx } from '../components/ProjectLayout'
 import { Badge, Banner, Dialog, EmptyState, Icon, PageMenu, Permission, SceneChip, useAction } from '../components/ui'
 import { SceneNav } from '../components/SceneNav'
+import { Mark, SceneFind, useSceneFind } from '../components/SceneFind'
+import { matchScene, sceneText } from '../lib/sceneSearch'
 import { useTopbarHeight } from '../lib/useTopbarHeight'
 import { useMedia } from '../components/ProjectLayout'
 import { removeFolder } from '../lib/storyboard'
@@ -38,23 +40,23 @@ function markProps(e: Element): { 'data-rev'?: number; style?: CSSProperties; ti
 }
 
 /** Standard screenplay layout for a list of typed elements. */
-function Screenplay({ elements }: { elements: Element[] }) {
+function Screenplay({ elements, query = '' }: { elements: Element[]; query?: string }) {
   const blocks: { key: number; node: ReactElement }[] = []
   let i = 0
   while (i < elements.length) {
     const e = elements[i]
     if (e.kind === 'character') {
       const start = i
-      const group: ReactElement[] = [<p key={i} className="lb-sp-char" {...markProps(e)}>{e.text}</p>]
+      const group: ReactElement[] = [<p key={i} className="lb-sp-char" {...markProps(e)}><Mark text={e.text} query={query} /></p>]
       i++
       while (i < elements.length && (elements[i].kind === 'dialogue' || elements[i].kind === 'parenthetical')) {
         const d = elements[i]
-        group.push(<p key={i} className={d.kind === 'dialogue' ? 'lb-sp-dlg' : 'lb-sp-par'} {...markProps(d)}>{d.text}</p>)
+        group.push(<p key={i} className={d.kind === 'dialogue' ? 'lb-sp-dlg' : 'lb-sp-par'} {...markProps(d)}><Mark text={d.text} query={query} /></p>)
         i++
       }
       blocks.push({ key: start, node: <div className="lb-sp-group">{group}</div> })
     } else {
-      blocks.push({ key: i, node: <p className={e.kind === 'transition' ? 'lb-sp-trans' : 'lb-sp-act'} {...markProps(e)}>{e.text}</p> })
+      blocks.push({ key: i, node: <p className={e.kind === 'transition' ? 'lb-sp-trans' : 'lb-sp-act'} {...markProps(e)}><Mark text={e.text} query={query} /></p> })
       i++
     }
   }
@@ -248,6 +250,7 @@ export default function Script() {
   const canEdit = level === 'edit'
   const locked = b.project.script_locked
   const zoom = useScriptZoom()
+  const find = useSceneFind()
   const [zoomOpen, setZoomOpen] = useState(false)
   const bibleQ = useBibleFormat(pid, true)   // the target runtime lives in the Project bible; people who cannot read it simply get nothing back
   const [runtimeDlg, setRuntimeDlg] = useState(false)
@@ -445,6 +448,12 @@ export default function Script() {
   const navProps = { scenes, activeId, onGo: goTo, canEdit, locked, onDelete: deleteScene, onStatus: setStatus }
 
   const anyReadable = active.some((s) => readable(s.id))
+  // Search: number, heading and, only for scenes this person may read, the words. Locked and omitted scenes match on the heading alone.
+  const found = (s: Scene, idx: number) => matchScene(find.q, {
+    number: s.display_number ?? idx + 1, heading: s.heading,
+    text: s.status !== 'omitted' && readable(s.id) ? sceneText(texts.data?.get(s.id)?.elements ?? []) : undefined,
+  })
+  const shownCount = find.q ? scenes.filter(found).length : scenes.length
   return (
     <>
       {head}
@@ -463,6 +472,27 @@ export default function Script() {
         )}
       </div>
       {navAct.error && !lockDialog && <p className="lb-error" role="alert">{navAct.error}</p>}
+      {scenes.length > 0 && (
+        <div className="lb-scriptbar" style={{ top: barTop + 6 }}>
+          {phone
+            ? <button type="button" className="lb-btn lb-btn--icon" aria-label={`Scenes, ${active.length}`} title="Scenes" aria-haspopup="dialog" onClick={() => setSheetOpen(true)}><Icon name="scenes" /></button>
+            : <button type="button" className="lb-btn lb-btn--icon" aria-label={navCollapsed ? 'Show the scene list' : 'Hide the scene list'} title={navCollapsed ? 'Show the scene list' : 'Hide the scene list'} aria-pressed={!navCollapsed} onClick={toggleNav}><Icon name="scenes" /></button>}
+          <SceneFind find={find} shown={shownCount} inline />
+          {!find.open && (
+            <div className="lb-zoomwrap">
+              {zoomOpen && (
+                <div className="lb-zoom-menu" role="listbox" aria-label="Zoom level">
+                  {[...ZOOM_STEPS].reverse().map((z) => (
+                    <button key={z} type="button" role="option" aria-selected={zoom.value === z} className={zoom.value === z ? 'is-on' : ''} onClick={() => { zoom.setValue(z); setZoomOpen(false) }}>{z}%</button>
+                  ))}
+                  <button type="button" role="option" aria-selected={zoom.value === 'fit'} className={zoom.value === 'fit' ? 'is-on' : ''} onClick={() => { zoom.setValue('fit'); setZoomOpen(false) }}>Fit width</button>
+                </div>
+              )}
+              <button type="button" className="lb-zoom-pill" aria-haspopup="listbox" aria-expanded={zoomOpen} aria-label={`Zoom ${zoom.percent} percent`} title="Zoom (Ctrl or Cmd and plus or minus)" onClick={() => setZoomOpen((v) => !v)}>{zoom.percent}%</button>
+            </div>
+          )}
+        </div>
+      )}
       <div className={'lb-scriptlayout' + (phone || scenes.length === 0 ? ' is-single' : '') + (navCollapsed ? ' is-collapsed' : '')}>
       {!phone && scenes.length > 0 && <aside className="lb-scenenav-wrap"><SceneNav {...navProps} collapsed={navCollapsed} onToggle={toggleNav} /></aside>}
       <div className="lb-scriptmain" ref={zoom.setEl}>
@@ -479,24 +509,21 @@ export default function Script() {
       )}
       {scenes.length > 0 && (
         <>
-        {phone && (
-          <div className="lb-scenebar" style={{ top: barTop + 6 }}>
-            <button type="button" className="lb-btn lb-btn--icon" aria-label={`Scenes, ${active.length}`} title="Scenes" aria-haspopup="dialog" onClick={() => setSheetOpen(true)}><Icon name="scenes" /></button>
-          </div>
-        )}
         {phone && sheetOpen && (
           <Dialog title={`Scenes ${active.length}`} sheet onClose={() => setSheetOpen(false)}>
             <div className="lb-scenebar-panel"><SceneNav {...navProps} collapsed={false} onToggle={() => undefined} showToggle={false} /></div>
           </Dialog>
         )}
         <div className="lb-paper" style={{ '--z': zoom.percent / 100 } as CSSProperties}>
+          {find.q && shownCount === 0 && <p className="lb-caption" role="status">No scenes match “{find.q}”.</p>}
           {scenes.map((s, idx) => {
+            if (find.q && editing !== s.id && !found(s, idx)) return null
             const num = s.display_number
             const numEl = <span className={'lb-sd-num' + (num === null ? ' is-draft' : '')} title={num === null ? 'Not numbered until the script is locked' : `Scene ${num}`}>{num ?? idx + 1}</span>
             if (s.status === 'omitted') {
               return (
                 <div key={s.id} className="lb-sd lb-sd--omitted" id={`scene-${s.id}`}>
-                  <div className="lb-sd-head">{numEl}<span className="lb-sp-h">{s.heading || 'Scene'} <span className="lb-sd-omit">Omitted</span></span></div>
+                  <div className="lb-sd-head">{numEl}<span className="lb-sp-h">{s.heading ? <Mark text={s.heading} query={find.q} /> : 'Scene'} <span className="lb-sd-omit">Omitted</span></span></div>
                 </div>
               )
             }
@@ -511,7 +538,7 @@ export default function Script() {
               <div key={s.id} className="lb-sd" id={`scene-${s.id}`}>
                 <header className="lb-sd-head">
                   {numEl}
-                  <h2 className="lb-sp-h">{s.heading || <span className="lb-muted">No heading yet</span>}</h2>
+                  <h2 className="lb-sp-h">{s.heading ? <Mark text={s.heading} query={find.q} /> : <span className="lb-muted">No heading yet</span>}</h2>
                   <span className="lb-sd-tools">
                     {s.revised_in ? <span className="lb-revtag" style={{ '--rev': revisionColour(s.revised_in) } as CSSProperties} title="Changed after the lock. Check what depends on this scene.">{revisionLabel(s.revised_in)} revision</span> : null}
                     {someoneElse && <span className="lb-sd-note"><Icon name="pencil" /> Being edited by {nameOf(lk.holder)}</span>}
@@ -519,7 +546,7 @@ export default function Script() {
                   </span>
                 </header>
                 {can ? (
-                  t && t.elements.length ? <Screenplay elements={t.elements} /> : <p className="lb-caption lb-sd-body">{texts.isLoading ? 'Loading' : 'No text yet.'}</p>
+                  t && t.elements.length ? <Screenplay elements={t.elements} query={find.q} /> : <p className="lb-caption lb-sd-body">{texts.isLoading ? 'Loading' : 'No text yet.'}</p>
                 ) : (
                   <p className="lb-sd-body lb-rolock"><Icon name="lock" /><span className="lb-sr">This scene's text is not shared with you.</span></p>
                 )}
@@ -580,19 +607,6 @@ export default function Script() {
             <button className="lb-btn lb-btn--primary" disabled={revAct.busy} onClick={startNextRevision}>Start {revisionLabel(b.project.revision_no + 1)} revision</button>
           </div>
         </Dialog>
-      )}
-      {scenes.length > 0 && (
-        <div className="lb-zoom">
-          {zoomOpen && (
-            <div className="lb-zoom-menu" role="listbox" aria-label="Zoom level">
-              {[...ZOOM_STEPS].reverse().map((z) => (
-                <button key={z} type="button" role="option" aria-selected={zoom.value === z} className={zoom.value === z ? 'is-on' : ''} onClick={() => { zoom.setValue(z); setZoomOpen(false) }}>{z}%</button>
-              ))}
-              <button type="button" role="option" aria-selected={zoom.value === 'fit'} className={zoom.value === 'fit' ? 'is-on' : ''} onClick={() => { zoom.setValue('fit'); setZoomOpen(false) }}>Fit width</button>
-            </div>
-          )}
-          <button type="button" className="lb-zoom-pill" aria-haspopup="listbox" aria-expanded={zoomOpen} aria-label={`Zoom ${zoom.percent} percent`} title="Zoom (Ctrl or Cmd and plus or minus)" onClick={() => setZoomOpen((v) => !v)}>{zoom.percent}%</button>
-        </div>
       )}
     </>
   )

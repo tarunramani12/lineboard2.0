@@ -6,6 +6,8 @@ import { Badge, Banner, EmptyState, Icon, Permission, SceneChip, useOnline } fro
 import { friendlyError } from '../lib/errors'
 import { useFolded } from '../lib/folded'
 import { FoldAll } from '../components/FoldAll'
+import { Mark, SceneFind, useSceneFind } from '../components/SceneFind'
+import { matchScene } from '../lib/sceneSearch'
 import { isOwnerOrAdmin, levelFor, useScenes } from '../lib/project'
 import { SECTIONS } from '../lib/sections'
 import { canEditShotsFor, shotLabel, useShots, type Shot } from '../lib/shots'
@@ -307,6 +309,8 @@ function FrameEditor({ shot, label, scene, frame, canEdit, urls, usedByOthers, c
 export default function Storyboard() {
   const { b, pid } = useOutletContext<Ctx>()
   const fold = useFolded(pid, 'storyboard')
+  const find = useSceneFind()
+  const isOpen = (id: string) => (find.q ? true : fold.isOpen(id))   // a search opens what it finds without touching the saved choice
   const qc = useQueryClient()
   const online = useOnline()
   const scenes = useScenes(pid).data ?? []
@@ -405,6 +409,8 @@ export default function Storyboard() {
 
   const openShot = open ? shots.find((s) => s.id === open) : undefined
   const openScene = openShot ? scenes.find((s) => s.id === openShot.scene_id) : undefined
+  const withShots = scenes.filter((sc) => (bySceneId.get(sc.id)?.length ?? 0) > 0)
+  const found = (sc: Scene) => matchScene(find.q, { number: sc.display_number ?? scenes.indexOf(sc) + 1, heading: sc.heading })
   return (
     <>
       {head}
@@ -435,18 +441,18 @@ export default function Storyboard() {
       <div className="lb-sheet lb-boards">
         {scenes.map((sc, si) => {
           const list = bySceneId.get(sc.id) ?? []
-          if (!list.length) return null
+          if (!list.length || !found(sc)) return null
           return (
             <section key={sc.id} className="lb-shotscene" aria-label={`Scene ${sc.display_number ?? si + 1}`}>
               <header className="lb-shotscene-head">
-                <button className="lb-fold" aria-expanded={fold.isOpen(sc.id)} onClick={() => fold.toggle(sc.id)}>
+                <button className="lb-fold" aria-expanded={isOpen(sc.id)} onClick={() => fold.toggle(sc.id)}>
                   <Icon name="chev" />
                   <SceneChip n={sc.display_number} position={si + 1} omitted={sc.status === 'omitted'} />
-                  <h2 className="lb-sp-h">{sc.heading || <span className="lb-muted">No heading yet</span>}</h2>
+                  <h2 className="lb-sp-h">{sc.heading ? <Mark text={sc.heading} query={find.q} /> : <span className="lb-muted">No heading yet</span>}</h2>
                   <span className="lb-caption lb-shotcount">{list.length} {list.length === 1 ? 'shot' : 'shots'}</span>
                 </button>
               </header>
-              {fold.isOpen(sc.id) && <div className="lb-grid">
+              {isOpen(sc.id) && <div className="lb-grid">
                 {list.map((s, i) => {
                   const f = frames.get(s.id)
                   const editable = canEditShotsFor(b, s.team_id)
@@ -467,8 +473,10 @@ export default function Storyboard() {
             </section>
           )
         })}
+        {find.q && !withShots.some(found) && <p className="lb-caption" role="status">No scenes match “{find.q}”.</p>}
       </div>
       </div>
+      {withShots.length > 0 && <SceneFind find={find} shown={withShots.filter(found).length} />}
 
       {openShot && openScene && (
         <FrameEditor

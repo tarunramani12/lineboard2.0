@@ -18,6 +18,8 @@ import {
 import { removeFolder } from '../lib/storyboard'
 import { armRowDrag } from '../lib/dragGate'
 import { FoldAll } from '../components/FoldAll'
+import { Mark, SceneFind, useSceneFind } from '../components/SceneFind'
+import { matchScene } from '../lib/sceneSearch'
 import { useFolded } from '../lib/folded'
 import { supabase } from '../lib/supabase'
 import type { Scene } from '../lib/types'
@@ -274,6 +276,9 @@ export default function ShotList() {
   const [dlg, setDlg] = useState<{ shotId: string | null; sceneId: string; after: string | null } | null>(null)
   const [showOmitted, setShowOmitted] = useState<Set<string>>(new Set())
   const fold = useFolded(pid, 'shots')
+  const find = useSceneFind()
+  const isOpen = (id: string) => (find.q ? true : fold.isOpen(id))   // a search opens what it finds without touching the saved choice
+  const found = (sc: Scene, si: number) => matchScene(find.q, { number: sc.display_number ?? si + 1, heading: sc.heading })
   const [error, setError] = useState<string | null>(null)
 
   const bySceneId = useMemo(() => {
@@ -388,6 +393,7 @@ export default function ShotList() {
             <span>Shot</span><span>Description</span><span>Size · movement</span><span>Lens</span><span>Team</span><span>Status</span><span />
           </div>
           {scenes.map((sc, si) => {
+            if (!found(sc, si)) return null
             const list = bySceneId.get(sc.id) ?? []
             const omitted = sc.status === 'omitted'
             if (omitted && !showOmitted.has(sc.id)) {
@@ -402,16 +408,16 @@ export default function ShotList() {
             return (
               <section key={sc.id} className="lb-shotscene" aria-label={`Scene ${sc.display_number ?? si + 1}`}>
                 <header className="lb-shotscene-head">
-                  <button className="lb-fold" aria-expanded={fold.isOpen(sc.id)} onClick={() => fold.toggle(sc.id)}>
+                  <button className="lb-fold" aria-expanded={isOpen(sc.id)} onClick={() => fold.toggle(sc.id)}>
                     <Icon name="chev" />
                     <SceneChip n={sc.display_number} position={si + 1} omitted={omitted} />
-                    <h2 className="lb-sp-h">{sc.heading || <span className="lb-muted">No heading yet</span>}</h2>
+                    <h2 className="lb-sp-h">{sc.heading ? <Mark text={sc.heading} query={find.q} /> : <span className="lb-muted">No heading yet</span>}</h2>
                     <span className="lb-caption lb-shotcount">{list.length} {list.length === 1 ? 'shot' : 'shots'}</span>
                   </button>
                   {sc.revised_in ? <Badge kind="conflict" ><Icon name="warn" /> Scene revised ({revisionLabel(sc.revised_in)}). Check these shots.</Badge> : null}
                   {canAdd && !omitted && <button className="lb-btn lb-btn--sm lb-addshot" aria-label="Add shot" onClick={() => setDlg({ shotId: null, sceneId: sc.id, after: null })}><Icon name="plus" /> <span className="lb-addshot-txt">Add shot</span></button>}
                 </header>
-                {fold.isOpen(sc.id) && (
+                {isOpen(sc.id) && (
                 <>
                 {list.length === 0 && <p className="lb-caption lb-shotempty">No shots yet.</p>}
                 {list.map((s, i) => {
@@ -458,9 +464,11 @@ export default function ShotList() {
               </section>
             )
           })}
+          {find.q && !scenes.some(found) && <p className="lb-caption lb-shotempty" role="status">No scenes match “{find.q}”.</p>}
         </div>
       )}
       </div>
+      {scenes.length > 0 && <SceneFind find={find} shown={scenes.filter(found).length} />}
       {dlg && dlgScene && (
         <ShotDialog
           key={dlg.shotId ?? `new-${dlg.sceneId}-${dlg.after}`}

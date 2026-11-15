@@ -186,7 +186,7 @@ export default function CastCrew() {
   const level = levelFor(b, 'cast_crew')
   const mine = teamsICanEditCrew(b)
   const [open, setOpen] = useState<{ id: string | null } | null>(null)
-  const [show, setShow] = useState<'all' | CrewKind>('all')
+  const [show, setShow] = useState<CrewKind>('crew')   // the page opens on Crew; Cast is one click away
   const [teamFilter, setTeamFilter] = useState('')
   const [note, setNote] = useState<string | null>(null)
   const [error, setError] = useState<string | null>(null)
@@ -228,7 +228,9 @@ export default function CastCrew() {
     refresh()
   }
 
-  const shown = rows.filter((r) => (show === 'all' || r.kind === show) && (!teamFilter || r.department === teamFilter))
+  // The department filter belongs to Crew only: cast rows have no department.
+  const shown = rows.filter((r) => r.kind === show && (show === 'cast' || !teamFilter || r.department === teamFilter))
+  const rowMode = (show === 'cast' ? ' lb-ccrow--cast' : '') + (seeContacts ? '' : show === 'cast' ? 'nc' : ' lb-ccrow--nocontact')
   const openRow = open?.id ? rows.find((r) => r.id === open.id) ?? null : null
   const counts = { cast: rows.filter((r) => r.kind === 'cast').length, crew: rows.filter((r) => r.kind === 'crew').length }
   return (
@@ -237,13 +239,13 @@ export default function CastCrew() {
       <p className="lb-caption lb-phone-hide">One list for the whole project. Names, roles and call times are visible to everyone who can see this page. Phone and email are visible only to the admins and the AD team. Each row is managed by one team, and only that team edits it.</p>
       <div className="lb-row">
         <div className="lb-seg" role="group" aria-label="Show">
-          {([['all', `All ${rows.length}`], ['cast', `Cast ${counts.cast}`], ['crew', `Crew ${counts.crew}`]] as const).map(([k, l]) => (
+          {([['cast', `Cast ${counts.cast}`], ['crew', `Crew ${counts.crew}`]] as const).map(([k, l]) => (
             <button key={k} type="button" aria-pressed={show === k} aria-current={show === k ? 'true' : undefined} onClick={() => setShow(k)}>{l}</button>
           ))}
         </div>
-        <select className="lb-input" style={{ width: 'auto' }} aria-label="Department" value={teamFilter} onChange={(e) => setTeamFilter(e.target.value)}>
+        {show === 'crew' && <select className="lb-input" style={{ width: 'auto' }} aria-label="Department" value={teamFilter} onChange={(e) => setTeamFilter(e.target.value)}>
           <option value="">All departments</option>{[...new Set(rows.filter((r) => r.kind === 'crew').map((r) => r.department).filter(Boolean))].sort().map((d) => <option key={d} value={d}>{d}</option>)}
-        </select>
+        </select>}
         <span className="lb-grow" style={{ flex: 1 }} />
         {!phone && mine.length > 0 && (
           <>
@@ -262,21 +264,21 @@ export default function CastCrew() {
       {rows.length === 0 && !q.isLoading && <EmptyState title="Nobody on the list yet">Add people one at a time, or detect the cast from the speaking characters in the script.</EmptyState>}
       {rows.length > 0 && (
         <div className="lb-sheet">
-          <div className={'lb-thead lb-ccrow lb-cchead' + (seeContacts ? '' : ' lb-ccrow--nocontact')}><span>Name</span><span>Role</span><span>Department</span><span>Call</span><span>Make-up</span>{seeContacts && <span>Contact</span>}<span className="lb-cclock" /></div>
+          <div className={'lb-thead lb-ccrow lb-cchead' + rowMode}><span>{show === 'cast' ? 'Actor' : 'Name'}</span><span>{show === 'cast' ? 'Character' : 'Role'}</span>{show === 'crew' && <span>Department</span>}<span>Call</span><span>Make-up</span>{seeContacts && <span>Contact</span>}<span className="lb-cclock" /></div>
           {shown.map((r) => {
             const editable = canEditCrewFor(b, r.team_id)
             const c = contacts.get(r.id)
             return (
               <SwipeRow key={r.id} label={displayName(r) || r.role || 'this row'} canDelete={editable} confirmText="The person is removed from the Cast and crew list. This cannot be undone."
                 onDelete={async () => { const { data, error: e } = await supabase.from('cast_crew_rows').delete().eq('id', r.id).select('id'); if (e) throw new Error(errText(e)); if (!data?.length) throw new Error('You do not have permission to do that.'); refresh() }}>
-              <div className={'lb-ccrow lb-ccitem is-click' + (seeContacts ? '' : ' lb-ccrow--nocontact')} {...rowOpen(() => setOpen({ id: r.id }))}>
+              <div className={'lb-ccrow lb-ccitem is-click' + rowMode} {...rowOpen(() => setOpen({ id: r.id }))}>
                 <button className="lb-shotdesc" onClick={() => setOpen({ id: r.id })} aria-label={`Open ${displayName(r) || r.role}`}>
                   {isFormer(r) ? <span className="lb-muted">Former member</span> : r.name || <span className="lb-muted">{r.kind === 'cast' ? 'Not cast yet' : 'No name'}</span>}
                   {r.auto && <Badge kind="plain">Script</Badge>}
                   {r.account_id && <Badge kind="plain">Account</Badge>}
                 </button>
                 <span className="lb-shotcell">{r.kind === 'cast' ? <><span className="lb-muted">as </span>{r.role}</> : r.role || <span className="lb-muted lb-dash">–</span>}</span>
-                <span className="lb-shotcell">{r.kind === 'cast' ? <span className="lb-muted lb-dash">Cast</span> : r.department || <span className="lb-muted lb-dash">–</span>}</span>
+                {show === 'crew' && <span className="lb-shotcell">{r.department || <span className="lb-muted lb-dash">–</span>}</span>}
                 <span className="lb-shotcell">{r.call_time || <span className="lb-muted lb-dash">–</span>}</span>
                 <span className="lb-shotcell">{r.makeup_time || <span className="lb-muted lb-dash">–</span>}</span>
                 {seeContacts && <span className="lb-shotcell">{c && (c.phone || c.email) ? <>{c.phone}{c.phone && c.email ? ' · ' : ''}{c.email}</> : <span className="lb-muted lb-dash">–</span>}</span>}
@@ -285,7 +287,7 @@ export default function CastCrew() {
               </SwipeRow>
             )
           })}
-          {shown.length === 0 && <p className="lb-caption" style={{ padding: 16 }}>No rows match.</p>}
+          {shown.length === 0 && <p className="lb-caption" style={{ padding: 16 }}>{show === 'cast' ? 'No cast yet. Add a person, or detect the cast from the script.' : teamFilter ? 'No crew in this department.' : 'No crew yet. Add a person, or look under Cast.'}</p>}
         </div>
       )}
       {open && (open.id === null || openRow) && (

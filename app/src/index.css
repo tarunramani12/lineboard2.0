@@ -433,6 +433,9 @@ select.lb-input { appearance: auto; }
 /* Cast and crew */
 .lb-ccrow { display: grid; grid-template-columns: minmax(150px, 1.3fr) minmax(120px, 1fr) minmax(110px, 150px) 60px 64px minmax(140px, 1.4fr) 20px; gap: var(--space-3); align-items: center; padding: 0 16px; }
 .lb-ccrow--nocontact { grid-template-columns: minmax(150px, 1.3fr) minmax(120px, 1fr) minmax(110px, 150px) 60px 64px 20px; }
+/* the Cast view has no Department column */
+.lb-ccrow--cast { grid-template-columns: minmax(150px, 1.3fr) minmax(120px, 1fr) 60px 64px minmax(140px, 1.4fr) 20px; }
+.lb-ccrow--castnc { grid-template-columns: minmax(150px, 1.3fr) minmax(120px, 1fr) 60px 64px 20px; }
 .lb-cclock { display: flex; justify-content: flex-end; }
 .lb-ccitem.is-click { cursor: pointer; }
 @media (hover: hover) { .lb-ccitem.is-click:hover { background: var(--surface-soft); } }
@@ -978,3 +981,39 @@ select.lb-input:disabled { cursor: default; opacity: .6; }
 .lb-foldinfo { min-width: 0; min-height: var(--touch-min); display: flex; flex-direction: column; justify-content: center; gap: var(--space-2); }
 .lb-foldinfo--pad { padding-left: 56px; }
 .lb-foldinfo > p { margin: 0; }
+
+/* Scene search: a floating button at the bottom right (like the zoom pill), opening a search bar. Cross clears and closes. */
+.lb-find { position: fixed; right: 16px; bottom: 16px; z-index: 6; display: flex; flex-direction: column; align-items: flex-end; }
+.lb-find--raised { bottom: 64px; }
+.lb-find-btn { display: inline-flex; align-items: center; justify-content: center; width: 44px; min-height: 44px; padding: 0; border-radius: 22px; }
+.lb-find-btn .lb-icon { width: 22px; height: 22px; }
+.lb-find-bar { display: flex; align-items: center; gap: 8px; width: min(360px, calc(100vw - 32px)); min-height: 48px; padding: 0 6px 0 12px; border-radius: var(--radius-lg); background: var(--paper); color: var(--ink); box-shadow: var(--shadow-3), 0 0 0 2px var(--ink); }
+.lb-find-input { flex: 1; min-width: 0; height: 44px; padding: 0; border: 0; background: transparent; color: inherit; font: inherit; font-size: 16px; outline: none; -webkit-appearance: none; appearance: none; }
+.lb-find-input::-webkit-search-cancel-button { display: none; }
+.lb-find-count { flex-shrink: 0; font-size: 13px; font-weight: 600; color: var(--ink-muted); white-space: nowrap; }
+.lb-find-x { position: relative; display: inline-flex; align-items: center; justify-content: center; width: 36px; height: 36px; padding: 0; border: 0; border-radius: var(--radius-md); background: transparent; color: var(--ink); cursor: pointer; }
+.lb-find-x::after { content: ""; position: absolute; inset: -4px; }
+.lb-find-x:focus-visible, .lb-find-btn:focus-visible { outline: 3px solid var(--ink); outline-offset: 2px; }
+@media (hover: hover) { .lb-find-x:hover { background: var(--surface-sunken); } }
+.lb-mark { background: #ffe27a; color: #000; border-radius: 2px; padding: 0 1px; }
+/* phone: the closed button sits above the bottom bar. The open bar goes under the top bar so the keyboard never hides it. */
+@media (max-width: 639px) {
+  .lb-find { right: 10px; bottom: calc(env(safe-area-inset-bottom, 0px) + 92px); }
+  .lb-find--raised { bottom: calc(env(safe-area-inset-bottom, 0px) + 140px); }
+  .lb-find.is-open { top: var(--find-top, 68px); bottom: auto; left: 10px; right: 10px; align-items: stretch; }
+  .lb-find.is-open .lb-find-bar { width: 100%; }
+}
+
+/* Script page bar: Scenes button, search, and the zoom pill at the far right. It stays under the top bar while the page scrolls. */
+.lb-scriptbar { position: sticky; z-index: 15; display: flex; align-items: center; gap: 8px; margin: 0 0 var(--space-3); pointer-events: none; }
+.lb-scriptbar > * { pointer-events: auto; }
+.lb-scriptbar > .lb-btn { box-shadow: var(--shadow-1); }
+.lb-scriptbar::after { content: ""; order: 2; flex: 1; pointer-events: none; }
+.lb-zoomwrap { order: 3; position: relative; }
+.lb-zoomwrap .lb-zoom-pill { box-shadow: var(--shadow-1); }
+.lb-zoomwrap .lb-zoom-menu { position: absolute; top: calc(100% + 6px); right: 0; z-index: 16; }
+.lb-find-inline { display: contents; }
+.lb-find-inline .lb-find-bar { flex: 1; width: auto; min-width: 0; box-shadow: var(--shadow-1), 0 0 0 2px var(--ink); }
+.lb-find-inline .lb-find-bar { order: 1; }
+.lb-scriptbar:has(.lb-find-bar)::after { display: none; }
+@media (max-width: 639px) { .lb-find-count { display: none; } }

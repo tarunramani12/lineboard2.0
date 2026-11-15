@@ -31,6 +31,7 @@ const paths: Record<string, ReactNode> = {
   s_team: <><path d="M12 3l8 3v6c0 4.5-3.2 8-8 9-4.8-1-8-4.5-8-9V6z" /><path d="M9 12l2 2 4-4" /></>,
   s_export: <><path d="M4 7h10M18 7h2M4 17h2M10 17h10" /><circle cx="16" cy="7" r="2" /><circle cx="8" cy="17" r="2" /></>,
   menu: <path d="M4 7h16M4 12h16M4 17h16" />,
+  search: <><circle cx="11" cy="11" r="6.5" /><path d="M16 16l4.5 4.5" /></>,
   unlock: <><rect x="5" y="11" width="14" height="9" rx="2" /><path d="M8 11V8a4 4 0 0 1 7.5-1.8" /></>,
   download: <path d="M12 4v11M7 11l5 5 5-5M5 20h14" />,
   expand: <path d="M7 9l5-5 5 5M7 15l5 5 5-5" />,

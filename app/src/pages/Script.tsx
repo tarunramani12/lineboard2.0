@@ -1,9 +1,10 @@
 import { useEffect, useMemo, useRef, useState, type ReactElement } from 'react'
-import { Link, useLocation, useOutletContext } from 'react-router-dom'
+import { Link, useLocation, useNavigate, useOutletContext } from 'react-router-dom'
 import { useQueryClient } from '@tanstack/react-query'
 import { navState, type Ctx } from '../components/ProjectLayout'
-import { Badge, Banner, Dialog, EmptyState, Icon, Permission, SceneChip, useAction } from '../components/ui'
+import { Badge, Banner, Dialog, EmptyState, Icon, PageMenu, Permission, SceneChip, useAction } from '../components/ui'
 import { SceneNav } from '../components/SceneNav'
+import { useTopbarHeight } from '../lib/useTopbarHeight'
 import { useMedia } from '../components/ProjectLayout'
 import { removeFolder } from '../lib/storyboard'
 import { ELEMENT_LABELS, LINES_PER_PAGE, estimateLines, looksLikeHeading, parseFountain, toFountain, type Element } from '../lib/fountain'
@@ -232,6 +233,7 @@ export function SceneEditor({ scene, after, scenes, locked, revisionNo, pid, ini
 export default function Script() {
   const { b, pid } = useOutletContext<Ctx>()
   const qc = useQueryClient()
+  const navigate = useNavigate()
   const routeState = useLocation().state as { imported?: number; draft?: string } | null
   const imported = routeState?.imported
   const draftNote = routeState?.draft
@@ -246,12 +248,14 @@ export default function Script() {
   const canEdit = level === 'edit'
   const locked = b.project.script_locked
   const zoom = useScriptZoom()
+  const [zoomOpen, setZoomOpen] = useState(false)
   const bibleQ = useBibleFormat(pid, true)   // the target runtime lives in the Project bible; people who cannot read it simply get nothing back
   const [runtimeDlg, setRuntimeDlg] = useState(false)
   const [runtimeDraft, setRuntimeDraft] = useState('')
   const runtimeAct = useAction()
   const runtime = bibleQ.data?.runtime_target ?? ''
   const canSetRuntime = canEditBibleArea(b, 'format')
+  const openRuntime = () => { runtimeAct.setError(null); setRuntimeDraft(runtime); setRuntimeDlg(true) }
   async function saveRuntime() {
     const ok = await runtimeAct.run(async () => {
       const { error } = await supabase.from('project_bible').upsert({ project_id: pid, runtime_target: runtimeDraft.trim() }, { onConflict: 'project_id' })
@@ -346,13 +350,33 @@ export default function Script() {
     } catch (e) { setExportError(friendlyError(e)) } finally { setExporting(null) }
   }
 
+  const phone = useMedia('(max-width: 639px)')
+  const navAct = useAction()
+  const [lockDialog, setLockDialog] = useState(false)
+  const canWrite = canEdit && !writing
+  // On a phone the Scenes button stays under the top bar while the page scrolls, so it is never out of reach.
+  const barTop = useTopbarHeight()
+  const menuItems = [
+    { label: 'Write a scene', icon: 'plus' as const, hidden: !canWrite, onClick: () => startWriting(null) },
+    { label: scenes.length ? 'Import a new draft' : 'Import a script', icon: 'download' as const, hidden: !isOwner(b) || Boolean(writing), onClick: () => navigate('import') },
+    { label: 'Download the script', icon: 'download' as const, hidden: !(active.length > 0), onClick: () => { setExportError(null); setExportOpen(true) } },
+    { label: 'Start next revision', icon: 'pencil' as const, hidden: !canStartRevision, onClick: () => setNextRevDialog(true) },
+    // On a phone the target runtime text stays on the page and its Set or Change action lives here; larger screens keep the small button beside the text.
+    { label: runtime ? 'Change target runtime' : 'Set target runtime', icon: 'pencil' as const, hidden: !canSetRuntime, onClick: openRuntime },
+    // The lock lives in this menu on a phone; larger screens keep the button beside the status badge.
+    { label: locked ? 'Unlock script' : 'Lock script', icon: (locked ? 'unlock' : 'lock') as 'unlock' | 'lock', hidden: !isOwner(b), onClick: () => { navAct.setError(null); setLockDialog(true) } },
+  ]
   const head = (
     <div className="lb-page-head">
       <h1 className="lb-title">Script</h1>
       <div className="lb-row">
         {locked ? <Badge kind="locked">Locked</Badge> : <Badge kind="plain">Unlocked</Badge>}
+        {isOwner(b) && !st.locked && !phone && (
+          <button type="button" className="lb-btn lb-btn--icon" aria-label={locked ? 'Unlock script' : 'Lock script'} title={locked ? 'Unlock script' : 'Lock script'} onClick={() => { navAct.setError(null); setLockDialog(true) }}><Icon name={locked ? 'unlock' : 'lock'} /></button>
+        )}
         {locked && <span className="lb-revtag" style={{ '--rev': revisionColour(b.project.revision_no) } as CSSProperties} title="Changes saved now are marked in this revision">Revision: {revisionLabel(b.project.revision_no)}</span>}
         {st.locked ? <Permission level="locked" why="No access" /> : <Permission level={canEdit ? 'edit' : 'view'} />}
+        {phone && !st.locked && <PageMenu label="Script actions" items={menuItems} />}
       </div>
     </div>
   )
@@ -370,7 +394,6 @@ export default function Script() {
   }
 
   // ---- the scene list beside the script
-  const phone = useMedia('(max-width: 639px)')
   const wideScreen = useMedia('(min-width: 1200px)')
   const [navPref, setNavPref] = useState<'0' | '1' | null>(() => { try { const v = localStorage.getItem('lb-scenenav'); return v === '1' || v === '0' ? v : null } catch { return null } })
   const navCollapsed = navPref === null ? !wideScreen : navPref === '1'
@@ -395,7 +418,6 @@ export default function Script() {
     setActiveId(id); setSheetOpen(false)
     document.getElementById(`scene-${id}`)?.scrollIntoView({ behavior: window.matchMedia('(prefers-reduced-motion: reduce)').matches ? 'auto' : 'smooth', block: 'start' })
   }
-  const navAct = useAction()
   async function deleteScene(sc: Scene) {
     // storyboard pictures of this scene's shots go with it
     const { data: sh } = await supabase.from('shots').select('id').eq('scene_id', sc.id)
@@ -411,7 +433,6 @@ export default function Script() {
       refresh()
     }, friendlyError)
   }
-  const [lockDialog, setLockDialog] = useState(false)
   async function toggleLock() {
     const ok = await navAct.run(async () => {
       // Locking numbers every scene in script order, then freezes the numbers (one step in the database).
@@ -429,16 +450,15 @@ export default function Script() {
       {head}
       <p className="lb-caption lb-phone-hide">Everyone on the project sees every scene heading. Action and dialogue show only for scenes shared with you. One person writes a scene at a time. Scenes get their numbers when the admin locks the script.</p>
       <div className="lb-row">
-        {canEdit && !writing && <button className="lb-btn lb-btn--primary" onClick={() => startWriting(null)}><Icon name="plus" /> Write a scene</button>}
-        {isOwner(b) && !writing && <Link className="lb-btn" to="import">{scenes.length ? 'Import a new draft' : 'Import a script'}</Link>}
-        {(anyReadable || active.length > 0) && <button className="lb-btn" onClick={() => { setExportError(null); setExportOpen(true) }}>Export</button>}
-        {canStartRevision && <button className="lb-btn" onClick={() => setNextRevDialog(true)}>Start next revision</button>}
-        {isOwner(b) && <button className="lb-btn" onClick={() => { navAct.setError(null); setLockDialog(true) }}><Icon name="lock" /> {locked ? 'Unlock script' : 'Lock script'}</button>}
+        {!phone && canEdit && !writing && <button className="lb-btn lb-btn--primary" onClick={() => startWriting(null)}><Icon name="plus" /> Write a scene</button>}
+        {!phone && isOwner(b) && !writing && <Link className="lb-btn" to="import">{scenes.length ? 'Import a new draft' : 'Import a script'}</Link>}
+        {!phone && (anyReadable || active.length > 0) && <button className="lb-btn" onClick={() => { setExportError(null); setExportOpen(true) }}><Icon name="download" /> Download</button>}
+        {!phone && canStartRevision && <button className="lb-btn" onClick={() => setNextRevDialog(true)}>Start next revision</button>}
         {totalLines > 0 && <span className="lb-caption">{aboutPages(totalLines)} in the scenes you can read</span>}
         {(runtime || canSetRuntime) && (
           <span className="lb-caption lb-runtime">
             {runtime ? <>Target runtime <b>{runtime}</b></> : 'No target runtime'}
-            {canSetRuntime && <button type="button" className="lb-btn lb-btn--sm lb-btn--quiet" onClick={() => { runtimeAct.setError(null); setRuntimeDraft(runtime); setRuntimeDlg(true) }}>{runtime ? 'Change' : 'Set'}</button>}
+            {canSetRuntime && !phone && <button type="button" className="lb-btn lb-btn--sm lb-btn--quiet" onClick={openRuntime}>{runtime ? 'Change' : 'Set'}</button>}
           </span>
         )}
       </div>
@@ -460,12 +480,14 @@ export default function Script() {
       {scenes.length > 0 && (
         <>
         {phone && (
-          <div className="lb-scenebar">
-            <button type="button" className="lb-btn lb-btn--sm lb-scenebar-btn" aria-expanded={sheetOpen} aria-controls="scenebar-panel" onClick={() => setSheetOpen((v) => !v)}>
-              <Icon name="panel" /> Scenes {active.length}{activeId ? ` · ${scenes.find((x) => x.id === activeId)?.display_number ?? 'now'}` : ''}
-            </button>
-            {sheetOpen && <div id="scenebar-panel" className="lb-scenebar-panel"><SceneNav {...navProps} collapsed={false} onToggle={() => undefined} showToggle={false} /></div>}
+          <div className="lb-scenebar" style={{ top: barTop + 6 }}>
+            <button type="button" className="lb-btn lb-btn--icon" aria-label={`Scenes, ${active.length}`} title="Scenes" aria-haspopup="dialog" onClick={() => setSheetOpen(true)}><Icon name="scenes" /></button>
           </div>
+        )}
+        {phone && sheetOpen && (
+          <Dialog title={`Scenes ${active.length}`} sheet onClose={() => setSheetOpen(false)}>
+            <div className="lb-scenebar-panel"><SceneNav {...navProps} collapsed={false} onToggle={() => undefined} showToggle={false} /></div>
+          </Dialog>
         )}
         <div className="lb-paper" style={{ '--z': zoom.percent / 100 } as CSSProperties}>
           {scenes.map((s, idx) => {
@@ -538,7 +560,7 @@ export default function Script() {
         </Dialog>
       )}
       {exportOpen && (
-        <Dialog title="Export the script" onClose={() => setExportOpen(false)}>
+        <Dialog title="Download the script" onClose={() => setExportOpen(false)}>
           <p>The file has the scenes you can read{locked ? ', with scene numbers' : ', without numbers because the script is not locked'}. {locked ? `Lines changed after the lock carry an asterisk in the margin in the PDF, and the page header names the ${revisionLabel(b.project.revision_no)} revision.` : ''}</p>
           <div className="lb-stack">
             <button className="lb-btn" disabled={exporting !== null} onClick={() => runExport('pdf')}>{exporting === 'pdf' ? 'Making the PDF' : 'PDF in screenplay layout'}</button>
@@ -560,14 +582,16 @@ export default function Script() {
         </Dialog>
       )}
       {scenes.length > 0 && (
-        <div className="lb-zoom" role="group" aria-label="Zoom the script">
-          <button type="button" className="lb-zoom-btn" onClick={() => zoom.step(-1)} disabled={zoom.percent <= 50} aria-label="Zoom out" title="Zoom out (Ctrl or Cmd and minus)">&minus;</button>
-          <select className="lb-zoom-sel" aria-label="Zoom level" value={zoom.value === 'fit' ? 'fit' : String(zoom.value)} onChange={(e) => zoom.setValue(e.target.value === 'fit' ? 'fit' : Number(e.target.value))}>
-            {zoom.value !== 'fit' && !(ZOOM_STEPS as readonly number[]).includes(zoom.value) && <option value={String(zoom.value)}>{zoom.value}%</option>}
-            {ZOOM_STEPS.map((z) => <option key={z} value={String(z)}>{z}%</option>)}
-            <option value="fit">Fit width ({zoom.percent}%)</option>
-          </select>
-          <button type="button" className="lb-zoom-btn" onClick={() => zoom.step(1)} disabled={zoom.percent >= 200} aria-label="Zoom in" title="Zoom in (Ctrl or Cmd and plus)">+</button>
+        <div className="lb-zoom">
+          {zoomOpen && (
+            <div className="lb-zoom-menu" role="listbox" aria-label="Zoom level">
+              {[...ZOOM_STEPS].reverse().map((z) => (
+                <button key={z} type="button" role="option" aria-selected={zoom.value === z} className={zoom.value === z ? 'is-on' : ''} onClick={() => { zoom.setValue(z); setZoomOpen(false) }}>{z}%</button>
+              ))}
+              <button type="button" role="option" aria-selected={zoom.value === 'fit'} className={zoom.value === 'fit' ? 'is-on' : ''} onClick={() => { zoom.setValue('fit'); setZoomOpen(false) }}>Fit width</button>
+            </div>
+          )}
+          <button type="button" className="lb-zoom-pill" aria-haspopup="listbox" aria-expanded={zoomOpen} aria-label={`Zoom ${zoom.percent} percent`} title="Zoom (Ctrl or Cmd and plus or minus)" onClick={() => setZoomOpen((v) => !v)}>{zoom.percent}%</button>
         </div>
       )}
     </>

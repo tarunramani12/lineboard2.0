@@ -14,6 +14,7 @@ export const SECTIONS: SectionDef[] = [
   { path: 'storyboard', icon: 's_storyboard', label: 'Storyboard', key: 'shots' },
   { path: 'breakdown', icon: 's_breakdown', label: 'Breakdown', key: 'breakdown' },
   { path: 'cast', icon: 's_cast', label: 'Cast and crew', key: 'cast_crew' },
+  { path: 'locations', icon: 's_locations', label: 'Locations', key: 'locations' },
   { path: 'props', icon: 's_props', label: 'Props', key: 'props' },
   { path: 'equipment', icon: 's_equipment', label: 'Equipment', key: 'equipment' },
   { path: 'schedule', icon: 's_schedule', label: 'Schedule', key: 'schedule' },
@@ -25,7 +26,7 @@ export const SECTIONS: SectionDef[] = [
 
 export const SECTION_LABELS: Record<SectionKey, string> = {
   script: 'Script', shots: 'Shot list and storyboard', cast_crew: 'Cast and crew',
-  props: 'Props', equipment: 'Equipment', breakdown: 'Breakdown', schedule: 'Schedule', call_sheets: 'Call sheets', bible: 'Project bible',
+  props: 'Props', equipment: 'Equipment', breakdown: 'Breakdown', schedule: 'Schedule', call_sheets: 'Call sheets', bible: 'Project bible', locations: 'Locations',
 }
 export const SECTION_KEYS = Object.keys(SECTION_LABELS) as SectionKey[]
 

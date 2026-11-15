@@ -10,6 +10,9 @@ import '@fontsource/courier-prime/400.css'
 import '@fontsource/courier-prime/700.css'
 import './index.css'
 import App from './App.tsx'
+import { initInstall } from './lib/install'
+
+initInstall()   // listen for the install prompt before the page is drawn
 
 createRoot(document.getElementById('root')!).render(
   <StrictMode>

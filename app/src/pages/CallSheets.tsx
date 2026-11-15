@@ -6,8 +6,10 @@ import { Badge, Banner, EmptyState, Icon, Permission, SceneChip } from '../compo
 import { useBreakdown } from '../lib/breakdown'
 import { useCastCrew } from '../lib/castcrew'
 import { callSheetPdf } from '../lib/callsheetPdf'
+import { platformMapsUrl, useLocations } from '../lib/locations'
+import { MET_CREDIT, useDayWeather } from '../lib/weather'
 import {
-  NO_DIFF, buildSnapshot, canEditSheets, diffCount, diffSnapshots, useCallSheets, type SheetDiff, type SheetRevision, type SheetSnapshot,
+  NO_DIFF, buildLocations, buildSnapshot, canEditSheets, diffCount, diffSnapshots, useCallSheets, type SheetDiff, type SheetRevision, type SheetSnapshot,
 } from '../lib/callsheets'
 import { friendlyError } from '../lib/errors'
 import { estimateLines } from '../lib/fountain'
@@ -80,18 +82,29 @@ export default function CallSheetsPage() {
     }
   }
   const lab = (s: { id: string; display_number: string | null }) => s.display_number ?? String(active.findIndex((x) => x.id === s.id) + 1)
+  // the locations of the day: every first-choice location of its scenes, plus the day's own, each with its forecast
+  const locQ = useLocations(pid)
+  const dayScenes = useMemo(() => {
+    if (!day) return []
+    return dayEntries(day.id, sched.data?.placements ?? [], sched.data?.shotPlacements ?? [], shotsQ.data ?? []).map((e) => active.find((s) => s.id === e.scene_id)).filter((s): s is NonNullable<typeof s> => Boolean(s))
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [day, sched.data, shotsQ.data, active])
+  const locBase = useMemo(() => buildLocations(dayScenes, { locs: locQ.data?.locs ?? [], firstOf: locQ.data?.firstOf ?? new Map(), dayLocationId: day?.location_id ?? null }), [dayScenes, locQ.data, day?.location_id])
+  const weather = useDayWeather(locBase.locations.map((l) => { const x = locQ.data?.locs.find((y) => y.id === l.id); return { id: l.id, lat: x?.lat ?? null, lng: x?.lng ?? null } }), day?.day_date)
   const live: SheetSnapshot | null = useMemo(() => {
     if (!day || !current) return null
     const entries = dayEntries(day.id, sched.data?.placements ?? [], sched.data?.shotPlacements ?? [], shotsQ.data ?? [])
-    const scenes = entries.map((e) => active.find((s) => s.id === e.scene_id)).filter((s): s is NonNullable<typeof s> => Boolean(s))
+    const scenes = dayScenes
+    const blocks = buildLocations(scenes, { locs: locQ.data?.locs ?? [], firstOf: locQ.data?.firstOf ?? new Map(), dayLocationId: day.location_id ?? null, weatherOf: (l) => weather.get(l.id) ?? '' })
     const partialOf = (s: { id: string }) => { const e = entries.find((x) => x.scene_id === s.id); const all = (shotsQ.data ?? []).filter((x) => x.scene_id === s.id).length; return e && all > 0 && e.shot_ids.length < all ? `${e.shot_ids.length} of ${all} shots` : '' }
     const rows = crewQ.data?.rows ?? []
     return buildSnapshot({
       project: b.project.name, schedule: current.name, days, day, draft: { general_call: draft?.general_call ?? '', hospital: draft?.hospital ?? '', notes: draft?.notes ?? '' },
       scenes, sceneInfo, partialOf, castRows: rows.filter((r) => r.kind === 'cast'), crewRows: rows.filter((r) => r.kind === 'crew'), sceneLabel: lab,
+      locations: blocks.locations, locationOfScene: blocks.locationOfScene,
     })
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [day, current, days, draft, active, sched.data, shotsQ.data, bd.data, crewQ.data, texts.data, b.project.name])
+  }, [day, current, days, draft, active, sched.data, shotsQ.data, bd.data, crewQ.data, texts.data, b.project.name, dayScenes, locQ.data, weather])
 
   const head = (
     <div className="lb-page-head">
@@ -261,13 +274,39 @@ export default function CallSheetsPage() {
             <section className="lb-card lb-stack" style={{ padding: 16 }}><span className="lb-label">Nearest hospital <Mark diff={diff} k="hospital" /></span><strong>{s.hospital || <span className="lb-muted">Not set</span>}</strong></section>
           </div>
 
+          {s.locations && s.locations.length > 0 && (
+            <section className="lb-card lb-stack" style={{ padding: 16 }} aria-label="Locations">
+              <div className="lb-spread">
+                <h3 className="lb-heading" style={{ margin: 0 }}>{s.locations.length > 1 ? 'Locations' : 'Location'}</h3>
+                {s.locations.length > 1 && <Badge kind="stale">Multiple locations {s.locations.length}</Badge>}
+              </div>
+              {s.locations.length > 1 && <p className="lb-caption">This day is shot in {s.locations.length} places. Unit base: <b>{s.locations.find((l) => l.base)?.code} {s.locations.find((l) => l.base)?.name}</b>. Each scene below shows the letter of its location.</p>}
+              {s.locations.map((l) => (
+                <div key={l.id} className={'lb-csloc' + (diff.changed.has('loc:' + l.id) ? ' is-changed' : '')}>
+                  <span className="lb-row" style={{ gap: 8 }}>
+                    {s.locations!.length > 1 && <span className="lb-scene">{l.code}</span>}
+                    <strong>{l.name}</strong>{l.base && s.locations!.length > 1 && <Badge kind="plain">Unit base</Badge>} <Mark diff={diff} k={'loc:' + l.id} />
+                    <a className="lb-btn lb-btn--sm" href={platformMapsUrl(l.map_url)} target="_blank" rel="noopener noreferrer">Open in Maps</a>
+                  </span>
+                  {l.address && <span className="lb-caption">{l.address}</span>}
+                  {l.parking && <span><span className="lb-label">Parking and unit base</span><br />{l.parking}</span>}
+                  {l.access && <span><span className="lb-label">Access and restrictions</span><br />{l.access}</span>}
+                  {l.hospital && <span><span className="lb-label">Nearest hospital</span><br />{l.hospital} <a href={platformMapsUrl(l.hospital_map_url)} target="_blank" rel="noopener noreferrer">Open in Maps</a></span>}
+                  {l.weather && <span><span className="lb-label">Weather</span><br />{l.weather}</span>}
+                  {s.locations!.length > 1 && l.scene_ids.length > 0 && <span className="lb-caption">Scenes: {l.scene_ids.map((id) => s.scenes.find((x) => x.id === id)?.number).filter(Boolean).join(', ')}</span>}
+                </div>
+              ))}
+              {s.locations.some((l) => l.weather) && <span className="lb-caption">{MET_CREDIT}</span>}
+            </section>
+          )}
+
           <section className="lb-card lb-stack" style={{ padding: 16 }} aria-label="Scenes">
             <h3 className="lb-heading" style={{ margin: 0 }}>Scenes</h3>
             {s.scenes.length === 0 ? <p className="lb-caption">No scenes are on this shoot day.</p> : s.scenes.map((x) => (
               <div key={x.id} className={'lb-csrow' + (diff.changed.has('scene:' + x.id) ? ' is-changed' : '')}>
                 <SceneChip n={x.number} />
                 <span className="lb-stack" style={{ gap: 2 }}><strong>{x.heading || 'No heading'} <Mark diff={diff} k={'scene:' + x.id} /></strong>
-                  <span className="lb-caption">{[x.ie, x.tod, x.pages && `${x.pages} pages`, x.partial, x.cast.length ? x.cast.join(', ') : ''].filter(Boolean).join('  ·  ')}</span></span>
+                  <span className="lb-caption">{[x.loc ? `Location ${x.loc}` : '', x.ie, x.tod, x.pages && `${x.pages} pages`, x.partial, x.cast.length ? x.cast.join(', ') : ''].filter(Boolean).join('  ·  ')}</span></span>
               </div>
             ))}
             {diff.removed.scenes.length > 0 && <p className="lb-caption">Removed since the previous revision: {diff.removed.scenes.join('; ')}.</p>}

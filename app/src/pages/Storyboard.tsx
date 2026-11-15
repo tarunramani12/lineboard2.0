@@ -49,11 +49,11 @@ function FrameThumb({ frame, urls, offline, ratio }: { frame: Frame | undefined;
 
 interface EditorProps {
   shot: Shot; label: string; scene: Scene; frame: Frame | undefined; canEdit: boolean
-  urls: Map<string, string> | undefined; usedByOthers: number; capBytes: number
+  urls: Map<string, string> | undefined; usedByOthers: number; capBytes: number; showUsage: boolean
   pid: string; ratio: string; onClose: () => void; onSaved: () => void
 }
 
-function FrameEditor({ shot, label, scene, frame, canEdit, urls, usedByOthers, capBytes, pid, ratio, onClose, onSaved }: EditorProps) {
+function FrameEditor({ shot, label, scene, frame, canEdit, urls, usedByOthers, capBytes, showUsage, pid, ratio, onClose, onSaved }: EditorProps) {
   const stage = stageSize(ratio)
   const [layers, setLayers] = useState<Layer[]>(frame?.layers ?? [])
   const [strokes, setStrokes] = useState<Stroke[]>(frame?.strokes ?? [])
@@ -288,7 +288,7 @@ function FrameEditor({ shot, label, scene, frame, canEdit, urls, usedByOthers, c
             </div>
           </>
         )}
-        <p className="lb-caption">This project uses {mb(used)} MB of {mb(capBytes)} MB for storyboard pictures. Marking a frame done flattens it into one picture and frees the space the layers used.</p>
+        <p className="lb-caption">{showUsage ? `This project uses ${mb(used)} MB of ${mb(capBytes)} MB for storyboard pictures. ` : ''}Marking a frame done flattens it into one picture and frees the space the layers used.</p>
         {error && <p className="lb-error" role="alert">{error}</p>}
         <div className="lb-actions" style={{ justifyContent: 'space-between' }}>
           <span className="lb-row">{canEdit && frame && <button className="lb-btn lb-btn--danger" disabled={busy} onClick={deleteFrame}>Delete frame</button>}</span>
@@ -409,12 +409,13 @@ export default function Storyboard() {
     <>
       {head}
       <p className="lb-caption lb-phone-hide">One frame for each shot. Add up to {MAX_LAYERS} photos, draw over them, and mark the frame done to flatten it into one picture. Frames belong to the shot's team.</p>
-      {!online && <Banner lead="Offline">Frames are blank without a connection. Export the storyboard as a PDF before you go somewhere with no signal.</Banner>}
+      {!online && <Banner lead="Offline">Frames are blank without a connection. Download the storyboard as a PDF before you go somewhere with no signal.</Banner>}
+      {isOwnerOrAdmin(b) && (   /* storage usage is for the project owner and admins only; others just get a clear message if a picture is refused */
       <div className="lb-row">
         <span className="lb-caption"><b>{mb(used)} MB</b> of {capMb} MB used</span>
         <span className="lb-meter" role="img" aria-label={`${Math.round(pct)} percent of the storyboard size limit used`}><span style={{ width: `${pct}%` }} /></span>
         {pct >= 90 && <Badge kind="conflict"><Icon name="warn" /> Nearly full</Badge>}
-        {isOwnerOrAdmin(b) && capEdit === null && <button className="lb-btn lb-btn--sm lb-btn--quiet" onClick={() => setCapEdit(String(capMb))}>Change limit</button>}
+        {capEdit === null && <button className="lb-btn lb-btn--sm lb-btn--quiet" onClick={() => setCapEdit(String(capMb))}>Change limit</button>}
         {capEdit !== null && (
           <span className="lb-row">
             <input className="lb-input" style={{ width: 110, minHeight: 36 }} type="number" min={10} max={5000} value={capEdit} aria-label="Size limit in MB" onChange={(e) => setCapEdit(e.target.value)} />
@@ -422,13 +423,15 @@ export default function Storyboard() {
             <button className="lb-btn lb-btn--sm lb-btn--quiet" onClick={() => setCapEdit(null)}>Cancel</button>
           </span>
         )}
-        <span className="lb-grow" />
-        <button className="lb-btn" disabled={exporting || !shots.length} onClick={exportPdf}>{exporting ? 'Making the PDF' : 'Export storyboard PDF'}</button>
       </div>
+      )}
       {error && <p className="lb-error" role="alert">{error}</p>}
       {!shots.length && <EmptyState title="No shots yet" action={<Link className="lb-btn" to="../shots">Open the Shot list</Link>}>Frames belong to shots. Add shots in the shot list first.</EmptyState>}
 
-      <div className="lb-row" style={{ justifyContent: 'flex-start' }}><FoldAll ids={scenes.filter((sc) => (bySceneId.get(sc.id)?.length ?? 0) > 0).map((sc) => sc.id)} fold={fold} /></div>
+      <div className="lb-foldscope">
+      <FoldAll ids={scenes.filter((sc) => (bySceneId.get(sc.id)?.length ?? 0) > 0).map((sc) => sc.id)} fold={fold} />
+      <div className="lb-row" style={{ justifyContent: 'flex-end' }}>
+        <button type="button" className="lb-btn lb-btn--icon" aria-label={exporting ? 'Making the PDF' : 'Download storyboard PDF'} title="Download storyboard PDF" disabled={exporting || !shots.length} onClick={exportPdf}><Icon name="download" /></button></div>
       <div className="lb-sheet lb-boards">
         {scenes.map((sc, si) => {
           const list = bySceneId.get(sc.id) ?? []
@@ -465,6 +468,7 @@ export default function Storyboard() {
           )
         })}
       </div>
+      </div>
 
       {openShot && openScene && (
         <FrameEditor
@@ -472,7 +476,7 @@ export default function Storyboard() {
           shot={openShot} scene={openScene}
           label={shotLabel(openScene, scenes.findIndex((s) => s.id === openScene.id), (bySceneId.get(openScene.id) ?? []).findIndex((s) => s.id === openShot.id) + 1)}
           frame={frames.get(openShot.id)} canEdit={canEditShotsFor(b, openShot.team_id)} urls={urls}
-          usedByOthers={used - (frames.get(openShot.id)?.bytes ?? 0)} capBytes={capMb * 1048576} pid={pid} ratio={ratio}
+          usedByOthers={used - (frames.get(openShot.id)?.bytes ?? 0)} capBytes={capMb * 1048576} showUsage={isOwnerOrAdmin(b)} pid={pid} ratio={ratio}
           onClose={() => setOpen(null)} onSaved={refresh}
         />
       )}

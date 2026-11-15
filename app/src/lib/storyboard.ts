@@ -123,9 +123,10 @@ export const toDraw = (l: Layer, img: CanvasImageSource, w: number, h: number): 
   ({ img, w, h, opacity: l.opacity, visible: l.visible, x: l.x, y: l.y, scale: l.scale, rot: l.rot })
 
 /** Paint the photo layers (fitted, moved, sized and turned as set, in order, each with its opacity) and then the pen strokes. The eraser only rubs out pen strokes. */
-export function paintFrame(ctx: CanvasRenderingContext2D, W: number, H: number, layers: DrawLayer[], strokes: Stroke[]) {
+/** `background: false` paints on a transparent canvas (used to lay a drawing over a photo that is shown separately). */
+export function paintFrame(ctx: CanvasRenderingContext2D, W: number, H: number, layers: DrawLayer[], strokes: Stroke[], background = true) {
   ctx.save()
-  ctx.fillStyle = '#fff'; ctx.fillRect(0, 0, W, H)
+  if (background) { ctx.fillStyle = '#fff'; ctx.fillRect(0, 0, W, H) }
   for (const l of layers) {
     if (!l.visible) continue
     const s = Math.min(W / l.w, H / l.h) * (l.scale ?? 1)

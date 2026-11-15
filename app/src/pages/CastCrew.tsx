@@ -2,7 +2,8 @@ import { useEffect, useMemo, useState } from 'react'
 import { Link, useOutletContext } from 'react-router-dom'
 import { useQueryClient } from '@tanstack/react-query'
 import { navState, type Ctx } from '../components/ProjectLayout'
-import { Badge, Choice, EmptyState, Icon, Permission, SwipeRow, rowOpen } from '../components/ui'
+import { Badge, Choice, EmptyState, Icon, PageMenu, Permission, SwipeRow, rowOpen } from '../components/ui'
+import { useMedia } from '../components/ProjectLayout'
 import {
   CREW_ROLES, canEditCrewFor, departmentOptions, canSeeContacts, displayName, isFormer, teamsICanEditCrew, useCastCrew,
   type CrewContact, type CrewKind, type CrewRow,
@@ -10,7 +11,7 @@ import {
 import { friendlyError } from '../lib/errors'
 import { isOwnerOrAdmin, levelFor } from '../lib/project'
 import { SECTIONS } from '../lib/sections'
-import { ReportButton } from '../components/ReportButton'
+import { ReportButton, useReportDownload } from '../components/ReportButton'
 import { buildReportPdf, fileSafe } from '../lib/reportPdf'
 import { castCrewReport } from '../lib/reports'
 import { supabase } from '../lib/supabase'
@@ -190,11 +191,20 @@ export default function CastCrew() {
   const [note, setNote] = useState<string | null>(null)
   const [error, setError] = useState<string | null>(null)
   const refresh = () => { void qc.invalidateQueries({ queryKey: ['castcrew', pid] }) }
+  const phone = useMedia('(max-width: 639px)')
+  const pdf = useReportDownload(fileSafe(b.project.name) + '-cast-and-crew', (size) => buildReportPdf(castCrewReport({ project: b.project.name, size, rows, contacts, withContacts: seeContacts, teams: b.teams })))
 
   const head = (
     <div className="lb-page-head">
       <h1 className="lb-title">Cast and crew</h1>
       {st.locked ? <Permission level="locked" why="No access" /> : <Permission level={level === 'edit' ? 'edit' : 'view'} />}
+      {phone && !st.locked && (
+        <PageMenu label="Cast and crew actions" items={[
+          { label: 'Add person', icon: 'plus', hidden: mine.length === 0, onClick: () => setOpen({ id: null }) },
+          { label: 'Detect cast from the script', icon: 'users', hidden: mine.length === 0 || show !== 'cast', onClick: () => void detect() },
+          { label: 'Download cast and crew PDF', icon: 'download', hidden: rows.length === 0, onClick: () => void pdf.go() },
+        ]} />
+      )}
     </div>
   )
   if (st.locked) {
@@ -235,17 +245,18 @@ export default function CastCrew() {
           <option value="">All departments</option>{[...new Set(rows.filter((r) => r.kind === 'crew').map((r) => r.department).filter(Boolean))].sort().map((d) => <option key={d} value={d}>{d}</option>)}
         </select>
         <span className="lb-grow" style={{ flex: 1 }} />
-        {mine.length > 0 && (
+        {!phone && mine.length > 0 && (
           <>
-            <button className="lb-btn" onClick={detect}>Detect cast from the script</button>
+            {show === 'cast' && <button className="lb-btn" onClick={detect}>Detect cast from the script</button>}
             <button className="lb-btn lb-btn--primary" onClick={() => setOpen({ id: null })}><Icon name="plus" /> Add person</button>
           </>
         )}
       </div>
-      <div className="lb-row" style={{ justifyContent: 'flex-end' }}>
+      {pdf.error && <p className="lb-error" role="alert">{pdf.error}</p>}
+      {!phone && <div className="lb-row" style={{ justifyContent: 'flex-end' }}>
         <ReportButton label="Download cast and crew PDF" file={fileSafe(b.project.name) + '-cast-and-crew'} disabled={rows.length === 0}
           build={(size) => buildReportPdf(castCrewReport({ project: b.project.name, size, rows, contacts, withContacts: seeContacts, teams: b.teams }))} />
-      </div>
+      </div>}
       {note && <p className="lb-caption" role="status">{note}</p>}
       {error && <p className="lb-error" role="alert">{error}</p>}
       {rows.length === 0 && !q.isLoading && <EmptyState title="Nobody on the list yet">Add people one at a time, or detect the cast from the speaking characters in the script.</EmptyState>}

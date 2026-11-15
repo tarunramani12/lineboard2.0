@@ -1,12 +1,17 @@
 import { useEffect, useState, type FormEvent, type ReactNode } from 'react'
 import { Link, Navigate, useLocation, useNavigate } from 'react-router-dom'
 import { useQuery, useQueryClient } from '@tanstack/react-query'
-import { passwordProblem, useAuth } from '../lib/auth'
+import { hasPasswordLogin, passwordProblem, signInWithProvider, useAuth } from '../lib/auth'
 import { friendlyError } from '../lib/errors'
 import { kickEmail } from '../lib/email'
 import { supabase, supabaseConfigured } from '../lib/supabase'
 import { Badge, Banner, Choice, Dialog, EmptyState, Field, Icon, Wordmark, useAction, useOnline } from '../components/ui'
 import { CREW_ROLES } from '../lib/castcrew'
+import { clearPictureCache } from '../lib/pictureCache'
+import { clearOfflineData } from '../lib/offline'
+import { signInReturnPath } from '../lib/returnPath'
+import { useIsAppAdmin } from '../lib/usage'
+import { InstallHint } from '../components/InstallHint'
 import { useMyJoinRequests, whoDecides, type CodeLookup } from '../lib/joinRequests'
 import { DEPARTMENT_ORDER } from '../lib/sections'
 
@@ -25,7 +30,26 @@ export function AuthFrame({ title, children, footer }: { title: string; children
         {children}
       </div>
       {footer && <div className="lb-caption" style={{ textAlign: 'center' }}>{footer}</div>}
+      <p className="lb-caption" style={{ textAlign: 'center' }}><Link to="/terms">Terms</Link> · <Link to="/privacy">Privacy</Link></p>
     </main>
+  )
+}
+
+/** Continue with Google, above the email form. Apple sign-in is not offered until it works. */
+function ProviderButtons({ onError }: { onError: (m: string) => void }) {
+  const [busy, setBusy] = useState<string | null>(null)
+  // Only shown when it works for everyone: set VITE_GOOGLE_SIGNIN=on in app/.env.local once the Google app is published.
+  if (import.meta.env.VITE_GOOGLE_SIGNIN !== 'on') return null
+  async function go(p: 'google' | 'apple') {
+    setBusy(p); onError('')
+    const e = await signInWithProvider(p)
+    if (e) { setBusy(null); onError(/not enabled|unsupported provider/i.test(e.message) ? `Signing in with ${p === 'google' ? 'Google' : 'Apple'} is not switched on yet.` : friendlyError(e)) }
+  }
+  return (
+    <div className="lb-stack" style={{ gap: 8 }}>
+      <button type="button" className="lb-btn lb-btn--block" disabled={busy !== null} onClick={() => void go('google')}>{busy === 'google' ? 'Opening Google' : 'Continue with Google'}</button>
+      <p className="lb-caption" style={{ textAlign: 'center', margin: '4px 0 0' }}>or use your email</p>
+    </div>
   )
 }
 
@@ -33,7 +57,8 @@ export function RequireAuth({ children }: { children: ReactNode }) {
   const { user, loading } = useAuth()
   const loc = useLocation()
   if (loading) return <main className="lb-account"><p className="lb-caption">Loading</p></main>
-  if (!user) return <Navigate to="/signin" replace state={{ from: loc.pathname + loc.search }} />
+  // Account settings is never a place to come back to (see signInReturnPath): signing out there must lead to the home page next time.
+  if (!user) return <Navigate to="/signin" replace state={{ from: signInReturnPath(loc.pathname, loc.search) }} />
   return <>{children}</>
 }
 
@@ -45,6 +70,7 @@ export function SignIn() {
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
   const { busy, error, run } = useAction()
+  const [oauthError, setOauthError] = useState('')
   useEffect(() => { if (user) nav(from, { replace: true }) }, [user, from, nav])
 
   async function submit(e: FormEvent) {
@@ -56,6 +82,8 @@ export function SignIn() {
   }
   return (
     <AuthFrame title="Sign in" footer={<>New here? <Link to="/signup" className="lb-body-strong">Create an account</Link></>}>
+      <ProviderButtons onError={setOauthError} />
+      {oauthError && <p className="lb-error" role="alert">{oauthError}</p>}
       <form className="lb-stack" onSubmit={submit}>
         <Field label="Email" type="email" autoComplete="email" required value={email} onChange={(e) => setEmail(e.target.value)} />
         <Field label="Password" type="password" autoComplete="current-password" required value={password} onChange={(e) => setPassword(e.target.value)} />
@@ -75,6 +103,7 @@ export function SignUp() {
   const [password, setPassword] = useState('')
   const [sent, setSent] = useState(false)
   const [touched, setTouched] = useState(false)
+  const [oauthError, setOauthError] = useState('')
   const { busy, error, run } = useAction()
   useEffect(() => { if (user) nav('/', { replace: true }) }, [user, nav])
   const pwProblem = touched ? passwordProblem(password) : null
@@ -104,6 +133,8 @@ export function SignUp() {
   }
   return (
     <AuthFrame title="Create an account" footer={<>Already have one? <Link to="/signin" className="lb-body-strong">Sign in</Link></>}>
+      <ProviderButtons onError={setOauthError} />
+      {oauthError && <p className="lb-error" role="alert">{oauthError}</p>}
       <form className="lb-stack" onSubmit={submit}>
         <Field label="Full name" autoComplete="name" required value={name} onChange={(e) => setName(e.target.value)} />
         <Field label="Email" type="email" autoComplete="email" required value={email} onChange={(e) => setEmail(e.target.value)}
@@ -224,6 +255,20 @@ export function Projects() {
     },
   })
 
+  // Creating projects is by invitation for now. The database decides; this only avoids offering a button that would fail.
+  const allowed = useQuery({
+    queryKey: ['can-create-project', user?.id],
+    enabled: Boolean(user),
+    staleTime: 60_000,
+    queryFn: async () => {
+      const { data, error } = await supabase.rpc('can_create_project')
+      if (error) return 'ok'   // an older database without the rule: let the database answer when a project is created
+      return String(data)
+    },
+  })
+  const blocked = allowed.data === 'not_invited' || allowed.data === 'projects_used'
+  const blockedNote = allowed.data === 'projects_used' ? 'You have used the projects you were invited to create.' : 'Creating projects is by invitation.'
+
   async function create(e: FormEvent) {
     e.preventDefault()
     const id = await run(async () => {
@@ -231,7 +276,8 @@ export function Projects() {
       if (error) throw error
       return data as string
     }, friendlyError)
-    if (id) { void qc.invalidateQueries({ queryKey: ['my-projects'] }); nav('/p/' + id) }
+    if (id) { void qc.invalidateQueries({ queryKey: ['my-projects'] }); void qc.invalidateQueries({ queryKey: ['can-create-project'] }); nav('/p/' + id) }
+    else void qc.invalidateQueries({ queryKey: ['can-create-project'] })
   }
 
   return (
@@ -242,9 +288,11 @@ export function Projects() {
           <h1 className="lb-title">Projects</h1>
           <div className="lb-row">
             <Link to="/join" className="lb-btn">Join with a code</Link>
-            <button className="lb-btn lb-btn--primary" onClick={() => { setCreating(true); setError(null) }}><Icon name="plus" /> New project</button>
+            <button className="lb-btn lb-btn--primary" disabled={blocked} onClick={() => { setCreating(true); setError(null) }}><Icon name="plus" /> New project</button>
           </div>
         </div>
+        <InstallHint />
+        {blocked && <p className="lb-caption" role="status">{blockedNote}</p>}
         {list.isLoading && <p className="lb-caption">Loading your projects</p>}
         {list.isError && <p className="lb-error" role="alert">{friendlyError(list.error)}</p>}
         {(waiting.data ?? []).length > 0 && (
@@ -266,8 +314,8 @@ export function Projects() {
           </section>
         )}
         {list.data && list.data.length === 0 && (waiting.data ?? []).length === 0 && (
-          <EmptyState title="No projects yet" action={<button className="lb-btn lb-btn--primary" onClick={() => setCreating(true)}>Create your first project</button>}>
-            Create a project to start planning, or join one with a code or an email invite.
+          <EmptyState title="No projects yet" action={blocked ? undefined : <button className="lb-btn lb-btn--primary" onClick={() => setCreating(true)}>Create your first project</button>}>
+            {blocked ? 'Join a project with a code or an email invite.' : 'Create a project to start planning, or join one with a code or an email invite.'}
           </EmptyState>
         )}
         <div className="lb-cards">
@@ -386,6 +434,7 @@ export function Settings() {
   const { user } = useAuth()
   const nav = useNavigate()
   const qc = useQueryClient()
+  const appAdmin = useIsAppAdmin(user?.id)   // the owner's usage dashboard link; everyone else sees nothing
   const profile = useQuery({
     queryKey: ['profile', user?.id], enabled: Boolean(user),
     queryFn: async () => {
@@ -422,7 +471,9 @@ export function Settings() {
     }, friendlyError)
   }
   /** Proves the person at the keyboard knows the current password. */
+  const withPassword = hasPasswordLogin(user)
   async function confirmPassword(current: string) {
+    if (!withPassword) { if (current.trim().toLowerCase() !== (user!.email ?? '').toLowerCase()) throw new Error('Type your email address exactly to confirm.'); return }
     const { error } = await supabase.auth.signInWithPassword({ email: user!.email!, password: current })
     if (error) throw new Error('The current password is not right.')
   }
@@ -443,7 +494,7 @@ export function Settings() {
       if (error) throw error
       return true
     }, friendlyError)
-    if (ok) { await supabase.auth.signOut(); nav('/signin', { replace: true }) }
+    if (ok) { await supabase.auth.signOut(); await clearPictureCache(); await clearOfflineData(); nav('/signin', { replace: true, state: { from: '/' } }) }
   }
   const blocked = (owned.data?.length ?? 0) > 0
 
@@ -460,7 +511,7 @@ export function Settings() {
           {profileAct.error && <p className="lb-error" role="alert">{profileAct.error}</p>}
           <div><button className="lb-btn" disabled={profileAct.busy || !shown.trim()}>Save name</button></div>
         </form>
-        <form className="lb-card lb-stack" onSubmit={savePw}>
+        {withPassword && <form className="lb-card lb-stack" onSubmit={savePw}>
           <h2 className="lb-heading">Password</h2>
           <Field label="Current password" type="password" autoComplete="current-password" value={curPw} onChange={(e) => setCurPw(e.target.value)}
             hint="Asked every time, so someone using your signed-in device cannot change it." />
@@ -468,10 +519,17 @@ export function Settings() {
             error={pwProblem} hint="At least 8 characters, with a letter and a number." />
           {pwAct.error && <p className="lb-error" role="alert">{pwAct.error}</p>}
           <div><button className="lb-btn" disabled={pwAct.busy || !pw || !curPw || Boolean(pwProblem)}>Change password</button></div>
-        </form>
+        </form>}
+        {appAdmin.data === true && (
+          <div className="lb-card lb-stack">
+            <h2 className="lb-heading">App admin</h2>
+            <p className="lb-caption">Counts and sizes for the whole app: accounts, projects, storage and email. Only app admins see this.</p>
+            <div><Link to="/usage" className="lb-btn">Open usage dashboard</Link></div>
+          </div>
+        )}
         <div className="lb-card lb-stack">
           <h2 className="lb-heading">Sign out</h2>
-          <div><button className="lb-btn" onClick={async () => { await supabase.auth.signOut(); qc.clear(); nav('/signin') }}>Sign out</button></div>
+          <div><button className="lb-btn" onClick={async () => { await supabase.auth.signOut(); await clearPictureCache(); await clearOfflineData(); qc.clear(); nav('/signin', { replace: true, state: { from: '/' } }) }}>Sign out</button></div>
         </div>
         <div className="lb-card lb-stack">
           <h2 className="lb-heading lb-red">Delete account</h2>
@@ -489,7 +547,7 @@ export function Settings() {
       {deleting && (
         <Dialog title="Delete your account?" onClose={() => setDeleting(false)}>
           <p>This cannot be undone. You will be signed out and cannot sign in again with this email unless you create a new account.</p>
-          <Field label="Your password" type="password" autoComplete="current-password" value={delPw} onChange={(e) => setDelPw(e.target.value)} />
+          <Field label={withPassword ? 'Your password' : 'Type your email address to confirm'} type={withPassword ? 'password' : 'email'} autoComplete={withPassword ? 'current-password' : 'off'} value={delPw} onChange={(e) => setDelPw(e.target.value)} />
           {delAct.error && <p className="lb-error" role="alert">{delAct.error}</p>}
           <div className="lb-actions">
             <button className="lb-btn" onClick={() => setDeleting(false)}>Keep my account</button>

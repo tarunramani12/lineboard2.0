@@ -15,6 +15,7 @@ import { breakdownReport } from '../lib/reports'
 import { canReadScene, revisionLabel, useMyScriptAccess, useSceneTexts } from '../lib/script'
 import { SECTIONS } from '../lib/sections'
 import { supabase } from '../lib/supabase'
+import { useLocations } from '../lib/locations'
 import type { Scene } from '../lib/types'
 
 const errText = (e: unknown) => (e instanceof Error && !('code' in e) ? e.message : friendlyError(e))
@@ -84,6 +85,7 @@ function SceneDialog({ scene, sceneIndex, items, allItems, form, castSuggestions
   const { b, pid } = useOutletContext<Ctx>()
   const mine = teamsIEditBreakdown(b)
   const canForm = mine.length > 0
+  const locNames = (useLocations(pid).data?.locs ?? []).filter((l) => l.status !== 'rejected').map((l) => l.name)
   const [draft, setDraft] = useState({ location: form?.location ?? '', story_date: form?.story_date ?? '', synopsis: form?.synopsis ?? '', notes: form?.notes ?? '' })
   const [formAt, setFormAt] = useState(form?.updated_at ?? null)
   const [busy, setBusy] = useState(false)
@@ -157,7 +159,7 @@ function SceneDialog({ scene, sceneIndex, items, allItems, form, castSuggestions
         <p className="lb-caption">{scene.heading || 'No heading yet'}</p>
 
         <div className="lb-shotgrid">
-          {field('bd-loc', 'Location', <input id="bd-loc" className="lb-input" value={draft.location} maxLength={200} disabled={!canForm || busy} onChange={(e) => set('location', e.target.value)} placeholder="Anna's kitchen" />)}
+          {field('bd-loc', 'Location', <><input id="bd-loc" className="lb-input" list="bd-locnames" value={draft.location} maxLength={200} disabled={!canForm || busy} onChange={(e) => set('location', e.target.value)} placeholder="Anna's kitchen" /><datalist id="bd-locnames">{locNames.map((n) => <option key={n} value={n} />)}</datalist></>)}
           {field('bd-date', 'Story date', <input id="bd-date" className="lb-input" value={draft.story_date} maxLength={100} disabled={!canForm || busy} onChange={(e) => set('story_date', e.target.value)} placeholder="Day 3, evening" />)}
         </div>
         {field('bd-syn', 'Synopsis', <textarea id="bd-syn" className="lb-input lb-textarea" rows={2} value={draft.synopsis} maxLength={1000} disabled={!canForm || busy} onChange={(e) => set('synopsis', e.target.value)} />)}

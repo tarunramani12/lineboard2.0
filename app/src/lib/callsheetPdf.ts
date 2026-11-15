@@ -24,6 +24,8 @@ export async function callSheetPdf(s: SheetSnapshot, o: PdfOptions): Promise<Blo
   y += 12
   doc.setFont('helvetica', 'bold'); doc.setFontSize(12)
   doc.text(`Shoot day ${s.day_no} of ${s.day_count}   ${star('date')}${formatDate(s.date, true)}`, M, y)
+  const many = (s.locations?.length ?? 0) > 1
+  if (many) doc.text(`MULTIPLE LOCATIONS: ${s.locations!.length}`, right, y, { align: 'right' })
   y += 5
   doc.setFont('helvetica', 'normal'); doc.setFontSize(9)
   const status = o.draft ? 'DRAFT, not published' : `Revision ${o.rev}${o.rev > 1 ? ', changed lines marked with *' : ''}${o.sentBy ? `, sent ${time(o.sentAt)} by ${o.sentBy}` : ''}`
@@ -41,6 +43,34 @@ export async function callSheetPdf(s: SheetSnapshot, o: PdfOptions): Promise<Blo
   })
   y = top + tall + 4; rule()
 
+  if (s.locations?.length) {
+    heading(s.locations.length > 1 ? 'Locations' : 'Location')
+    doc.setFontSize(9)
+    if (many) { const b = s.locations.find((l) => l.base); doc.setFont('helvetica', 'normal'); doc.text(`This day is shot in ${s.locations.length} places. Unit base: ${b?.code} ${b?.name}. Each scene shows its location letter.`, M, y + 3.5); y += 6 }
+    for (const l of s.locations) {
+      const lines: [string, string, string?][] = [
+        ['Address', l.address, l.map_url], ['Parking and unit base', l.parking], ['Access and restrictions', l.access], ['Nearest hospital', l.hospital, l.hospital_map_url], ['Weather', l.weather],
+      ].filter((r) => r[1]) as [string, string, string?][]
+      const sceneNums = s.locations.length > 1 ? l.scene_ids.map((id) => s.scenes.find((x) => x.id === id)?.number).filter(Boolean).join(', ') : ''
+      need(8 + lines.length * 5.5)
+      doc.setFont('helvetica', 'bold'); doc.setFontSize(10)
+      doc.text(`${star('loc:' + l.id)}${many ? l.code + '  ' : ''}${l.name}${many && l.base ? '  (UNIT BASE)' : ''}`, M, y + 4)
+      doc.setFont('helvetica', 'normal'); doc.setFontSize(9); doc.setTextColor(0, 0, 238)
+      doc.textWithLink('Open in Maps', right - 24, y + 4, { url: l.map_url }); doc.setTextColor(0, 0, 0)
+      y += 6
+      for (const [label, value, url] of lines) {
+        const wrapped = fit(value, usable - 50); need(wrapped.length * 4.2 + 1)
+        doc.setFont('helvetica', 'bold'); doc.setFontSize(8); doc.text(label.toUpperCase(), M + 4, y + 3.2)
+        doc.setFont('helvetica', 'normal'); doc.setFontSize(9); doc.text(wrapped, M + 50, y + 3.5)
+        if (url && label === 'Nearest hospital') { doc.setTextColor(0, 0, 238); doc.textWithLink('Open in Maps', right - 24, y + 3.5, { url }); doc.setTextColor(0, 0, 0) }
+        y += wrapped.length * 4.2 + 1
+      }
+      if (sceneNums) { doc.setFontSize(8.5); doc.text(`Scenes: ${sceneNums}`, M + 4, y + 3.2); y += 4.5 }
+      y += 2
+    }
+    if (s.locations.some((l) => l.weather)) { doc.setFontSize(7.5); doc.setFont('helvetica', 'italic'); doc.text('Weather data from MET Norway', M, y + 2.5); y += 4; doc.setFont('helvetica', 'normal') }
+  }
+
   heading('Scenes')
   doc.setFontSize(8)
   const sx = [M, M + 14, M + 92, M + 112, M + 128]
@@ -50,7 +80,7 @@ export async function callSheetPdf(s: SheetSnapshot, o: PdfOptions): Promise<Blo
   for (const sc of s.scenes) {
     const head = fit(sc.heading + (sc.partial ? ` (${sc.partial})` : ''), 76), cast = fit(sc.cast.join(', '), right - sx[4]); const h = Math.max(head.length, cast.length) * 4 + 2
     need(h); const m = star('scene:' + sc.id)
-    doc.text(m + sc.number, sx[0], y + 3.5); doc.text(head, sx[1], y + 3.5); doc.text(`${sc.ie} ${sc.tod}`.trim(), sx[2], y + 3.5); doc.text(sc.pages, sx[3], y + 3.5); doc.text(cast, sx[4], y + 3.5)
+    doc.text(m + sc.number + (sc.loc ? ' ' + sc.loc : ''), sx[0], y + 3.5); doc.text(head, sx[1], y + 3.5); doc.text(`${sc.ie} ${sc.tod}`.trim(), sx[2], y + 3.5); doc.text(sc.pages, sx[3], y + 3.5); doc.text(cast, sx[4], y + 3.5)
     y += h
   }
   if (o.diff.removed.scenes.length) { doc.setFont('helvetica', 'italic'); doc.text(`Removed: ${o.diff.removed.scenes.join('; ')}`, M, y + 3.5); y += 5; doc.setFont('helvetica', 'normal') }

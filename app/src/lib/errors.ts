@@ -2,6 +2,8 @@
 export function friendlyError(err: unknown): string {
   const raw = err instanceof Error ? err.message : typeof err === 'object' && err && 'message' in err ? String((err as { message: unknown }).message) : String(err)
   const m = raw.toLowerCase()
+  if (m.includes('not_invited')) return 'Creating projects is by invitation.'
+  if (m.includes('projects_used')) return 'You have used the projects you were invited to create.'
   if (m.includes('code_not_found')) return 'That code does not exist. Check the letters and try again.'
   if (m.includes('code_expired')) return 'This code has expired. Ask the person who sent it for a new one.'
   if (m.includes('code_revoked')) return 'This code was revoked. Ask the person who sent it for a new one.'

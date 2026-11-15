@@ -13,6 +13,7 @@ import { SECTIONS } from '../lib/sections'
 import { removeFolder } from '../lib/storyboard'
 import { RequestAccessCard } from '../components/AccessRequests'
 import { removeMoodFolder } from '../lib/bible'
+import { removeLocationFolder } from '../lib/locations'
 import { supabase } from '../lib/supabase'
 
 /** A section that exists in the navigation but is built in a later step. */
@@ -72,6 +73,7 @@ export function ExportSettings() {
     const ok = await act.run(async () => {
       await removeFolder(pid).catch(() => undefined)   // the storyboard pictures go with the project
       await removeMoodFolder(pid).catch(() => undefined)   // and the moodboard pictures
+      await removeLocationFolder(pid).catch(() => undefined)   // and the location photos
       const { error } = await supabase.from('projects').delete().eq('id', pid)
       if (error) throw error
       return true
@@ -119,7 +121,7 @@ export function ExportSettings() {
         <h2 className="lb-heading">PDFs for each department</h2>
         <p className="lb-caption lb-phone-hide">Each department downloads its own file from its own page, with the paper size you choose. You only see the pages you have access to. A lock means your team cannot open that page.</p>
         <ul className="lb-unlist">
-          {([['script', 'Script (screenplay layout, scene numbers)', 'script', 'script'], ['shots', 'Shot list', 'shots', 'shots'], ['storyboard', 'Storyboard pictures', 'storyboard', 'shots'], ['bible', 'Project bible', 'bible', 'bible'], ['breakdown', 'Breakdown', 'breakdown', 'breakdown'], ['cast', 'Cast and crew', 'cast', 'cast_crew'], ['props', 'Props, one per schedule', 'props', 'props'], ['equipment', 'Equipment, one per schedule', 'equipment', 'equipment'], ['schedule', 'Schedule', 'schedule', 'schedule'], ['callsheets', 'Call sheets, one per shoot day', 'callsheets', 'call_sheets']] as const).map(([path, label, , key]) => {
+          {([['script', 'Script (screenplay layout, scene numbers)', 'script', 'script'], ['shots', 'Shot list', 'shots', 'shots'], ['storyboard', 'Storyboard pictures', 'storyboard', 'shots'], ['bible', 'Project bible', 'bible', 'bible'], ['breakdown', 'Breakdown', 'breakdown', 'breakdown'], ['cast', 'Cast and crew', 'cast', 'cast_crew'], ['locations', 'Locations', 'locations', 'locations'], ['props', 'Props, one per schedule', 'props', 'props'], ['equipment', 'Equipment, one per schedule', 'equipment', 'equipment'], ['schedule', 'Schedule', 'schedule', 'schedule'], ['callsheets', 'Call sheets, one per shoot day', 'callsheets', 'call_sheets']] as const).map(([path, label, , key]) => {
             const open = levelFor(b, key) !== 'none'
             return (
               <li key={path} className={open ? 'is-click' : undefined} style={{ justifyContent: 'space-between', minHeight: 44 }} {...(open ? rowOpen(() => nav(`/p/${pid}/${path}`)) : {})}>

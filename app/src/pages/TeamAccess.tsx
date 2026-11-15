@@ -352,7 +352,7 @@ function Matrix({ b, pid }: { b: Bundle; pid: string }) {
     await act.run(async () => {
       const { data, error } = await supabase.from('teams').insert({ project_id: pid, name: name.trim() }).select('id').single()
       if (error) throw error
-      const rows = SECTION_KEYS.map((section) => ({ team_id: data.id as string, section, level: (section === 'equipment' ? 'edit' : (['schedule', 'call_sheets'] as string[]).includes(section) ? 'view' : 'none') as AccessLevel }))
+      const rows = SECTION_KEYS.map((section) => ({ team_id: data.id as string, section, level: (section === 'equipment' ? 'edit' : (['schedule', 'call_sheets', 'locations'] as string[]).includes(section) ? 'view' : 'none') as AccessLevel }))
       const r = await supabase.from('team_section_access').insert(rows)
       if (r.error) throw r.error
       setName(''); refresh()

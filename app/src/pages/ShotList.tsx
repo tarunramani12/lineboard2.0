@@ -356,23 +356,28 @@ export default function ShotList() {
     )
   }
 
+  const foldIds = scenes.filter((sc) => (bySceneId.get(sc.id)?.length ?? 0) > 0).map((sc) => sc.id)
   const dlgScene = dlg ? scenes.find((s) => s.id === dlg.sceneId) : undefined
   const dlgShot = dlg?.shotId ? shots.find((s) => s.id === dlg.shotId) ?? null : null
   return (
     <>
       {head}
-      <div className="lb-row" style={{ justifyContent: 'space-between' }}>
-        <FoldAll ids={scenes.filter((sc) => (bySceneId.get(sc.id)?.length ?? 0) > 0).map((sc) => sc.id)} fold={fold} />
+      <div className="lb-row" style={{ justifyContent: 'flex-end' }}>
         <ReportButton label="Download shot list PDF" file={fileSafe(b.project.name) + '-shot-list'} disabled={total === 0}
           build={(size) => buildReportPdf(shotsReport({ project: b.project.name, size, scenes: scenesQ.data ?? [], shots, teams: b.teams }))} />
       </div>
-      <p className="lb-caption lb-phone-hide">Shots are grouped by scene and numbered scene then shot, such as 42-3. The team that owns a shot edits it. Only the AD team changes whether a shot is planned, done or dropped.</p>
-      {total > 0 && (
-        <div className="lb-shotprogress" aria-label="Progress">
-          <span><b>{counts.done}</b> done · <b>{counts.dropped}</b> dropped · <b>{counts.planned}</b> planned</span>
-          <span className="lb-meter" aria-hidden="true"><span style={{ width: `${(counts.done / total) * 100}%` }} /><span className="is-dropped" style={{ width: `${(counts.dropped / total) * 100}%` }} /></span>
+      {/* The expand and collapse button starts at the left of the information below it and stays on screen under the top bar while the list scrolls. */}
+      <div className="lb-foldscope">
+        <FoldAll ids={foldIds} fold={fold} />
+        <div className={'lb-foldinfo' + (foldIds.length >= 2 ? ' lb-foldinfo--pad' : '')}>
+          <p className="lb-caption lb-phone-hide">Shots are grouped by scene and numbered scene then shot, such as 42-3. The team that owns a shot edits it. Only the AD team changes whether a shot is planned, done or dropped.</p>
+          {total > 0 && (
+            <div className="lb-shotprogress" aria-label="Progress">
+              <span><b>{counts.done}</b> done · <b>{counts.dropped}</b> dropped · <b>{counts.planned}</b> planned</span>
+              <span className="lb-meter" aria-hidden="true"><span style={{ width: `${(counts.done / total) * 100}%` }} /><span className="is-dropped" style={{ width: `${(counts.dropped / total) * 100}%` }} /></span>
+            </div>
+          )}
         </div>
-      )}
       {error && <p className="lb-error" role="alert">{error}</p>}
       {!scenesQ.isLoading && scenes.length === 0 && (
         <EmptyState title="No scenes yet" action={<Link className="lb-btn" to="../script">Open the Script</Link>}>Shots belong to scenes. Write or import the script first.</EmptyState>
@@ -455,6 +460,7 @@ export default function ShotList() {
           })}
         </div>
       )}
+      </div>
       {dlg && dlgScene && (
         <ShotDialog
           key={dlg.shotId ?? `new-${dlg.sceneId}-${dlg.after}`}

@@ -1,6 +1,6 @@
 # LineBoard 2.0
 
-Before doing anything in this project, read `summary.md` in this folder. It records what the project is, how the owner likes to work, every decision made, what is built, how to test it, and what comes next. Then read `docs/planning-document.md` for the full requirements when the task touches a feature.
+Before doing anything in this project, read `summary.md` in this folder. It records what the project is, how the owner likes to work, every decision made, what is built, how to test it, and what comes next. Then read `todo.md` (the open task list: tick items off and add new ones as work happens). Then read `docs/planning-document.md` for the full requirements when the task touches a feature.
 
 At the end of each work session, update `summary.md` (build state, decisions, gotchas) so the next session starts from the truth.
 

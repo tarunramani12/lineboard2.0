@@ -185,7 +185,7 @@ function CardDialog({ item, urls, canEdit, index, count, onMove, onClose, onChan
   )
 }
 
-function MoodTab({ pid, canEdit, capMb, otherBytes }: { pid: string; canEdit: boolean; capMb: number; otherBytes: number }) {
+function MoodTab({ pid, canEdit, capMb, otherBytes, showUsage }: { pid: string; canEdit: boolean; capMb: number; otherBytes: number; showUsage: boolean }) {
   const qc = useQueryClient()
   const q = useMoodboard(pid, true)
   const items = useMemo(() => q.data ?? [], [q.data])
@@ -252,7 +252,7 @@ function MoodTab({ pid, canEdit, capMb, otherBytes }: { pid: string; canEdit: bo
             <input ref={file} type="file" accept="image/*" multiple hidden aria-label="Choose pictures" onChange={(e) => void addPictures(e.target.files)} />
           </>
         )}
-        <span className="lb-caption">Pictures use {mb(used)} of {mb(capBytes)} MB, shared with the storyboard.</span>
+        {showUsage && <span className="lb-caption">Pictures use {mb(used)} of {mb(capBytes)} MB, shared with the storyboard.</span>}
       </div>
       {act.error && <p className="lb-error" role="alert">{act.error}</p>}
       {!q.isLoading && items.length === 0 && (
@@ -327,7 +327,7 @@ export default function Bible() {
           </div>
           {tab === 'format'
             ? <FormatTab pid={pid} ratio={ratio} canEdit={canEditFormat} hasFrames={frames.isLoading || (frames.data?.size ?? 0) > 0} />
-            : <MoodTab pid={pid} canEdit={canEditMood} capMb={b.project.image_cap_mb ?? 200} otherBytes={frameBytes} />}
+            : <MoodTab pid={pid} canEdit={canEditMood} capMb={b.project.image_cap_mb ?? 200} otherBytes={frameBytes} showUsage={isOwnerOrAdmin(b)} />}
         </>
       )}
     </>

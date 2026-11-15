@@ -24,12 +24,19 @@ const paths: Record<string, ReactNode> = {
   s_breakdown: <><path d="M4 7h3M4 12h3M4 17h3M10 7h10M10 12h10M10 17h10" /></>,
   s_cast: <><circle cx="9" cy="8" r="3" /><path d="M3 20a6 6 0 0 1 12 0" /><circle cx="17" cy="9" r="2.5" /><path d="M17 14.5a5 5 0 0 1 4 5.5" /></>,
   s_equipment: <><rect x="3" y="8" width="18" height="12" rx="2" /><path d="M9 8V6a2 2 0 0 1 2-2h2a2 2 0 0 1 2 2v2M3 14h18" /></>,
+  s_locations: <><path d="M12 21s-6.5-5.6-6.5-11a6.5 6.5 0 0 1 13 0c0 5.4-6.5 11-6.5 11z" /><circle cx="12" cy="10" r="2.4" /></>,
   s_props: <><path d="M5.5 13.5h13M7.5 13.5l1 6.5h7l1-6.5" /><path d="M12 13.5V9" /><path d="M12 11.5c-3.4 0-5-1.4-5-4.2 3.4 0 5 1.4 5 4.2z" /><path d="M12 9c0-2.6 1.6-4.2 5-4.2 0 2.8-1.6 4.2-5 4.2z" /></>,
   s_schedule: <><rect x="3" y="5" width="18" height="16" rx="2" /><path d="M3 10h18M8 3v4M16 3v4" /></>,
   s_callsheets: <><rect x="5" y="4" width="14" height="17" rx="2" /><path d="M9 4V3h6v1M9 11h6M9 15h6" /></>,
   s_team: <><path d="M12 3l8 3v6c0 4.5-3.2 8-8 9-4.8-1-8-4.5-8-9V6z" /><path d="M9 12l2 2 4-4" /></>,
   s_export: <><path d="M4 7h10M18 7h2M4 17h2M10 17h10" /><circle cx="16" cy="7" r="2" /><circle cx="8" cy="17" r="2" /></>,
   menu: <path d="M4 7h16M4 12h16M4 17h16" />,
+  unlock: <><rect x="5" y="11" width="14" height="9" rx="2" /><path d="M8 11V8a4 4 0 0 1 7.5-1.8" /></>,
+  download: <path d="M12 4v11M7 11l5 5 5-5M5 20h14" />,
+  expand: <path d="M7 9l5-5 5 5M7 15l5 5 5-5" />,
+  collapse: <path d="M7 5l5 5 5-5M7 19l5-5 5 5" />,
+  scenes: <path d="M4 6h16M4 12h16M4 18h10" />,
+  users: <><circle cx="9" cy="8" r="3" /><path d="M3 20a6 6 0 0 1 12 0M18 8v6M15 11h6" /></>,
 }
 export function Icon({ name }: { name: keyof typeof paths }) {
   return <svg className="lb-icon" viewBox="0 0 24 24" aria-hidden="true">{paths[name]}</svg>
@@ -270,15 +277,15 @@ export function Dialog({ title, children, onClose, sheet, badge, wide }: { title
     document.addEventListener('keydown', onKey)
     return () => document.removeEventListener('keydown', onKey)
   }, [onClose])
-  return (
-    <div className={'lb-scrim' + (sheet ? ' lb-sheet' : '')} onMouseDown={(e) => { if (e.target === e.currentTarget) onClose() }}>
+  // drawn straight under the page body, so no parent's layout can move or clip it
+  return createPortal(
+    <div className={'lb-scrim' + (sheet ? ' lb-scrim--sheet' : '')} onMouseDown={(e) => { if (e.target === e.currentTarget) onClose() }}>
       <div className={'lb-dialog' + (wide ? ' lb-dialog--wide' : '')} role="dialog" aria-modal="true" aria-label={title}>
         {badge}
         <h2>{title}</h2>
         {children}
       </div>
-    </div>
-  )
+    </div>, document.body)
 }
 
 /** Run an async action with a busy flag and a plain-language error. */
@@ -303,6 +310,30 @@ export function useOnline() {
     return () => { window.removeEventListener('online', on); window.removeEventListener('offline', off) }
   }, [])
   return online
+}
+
+/**
+ * The hamburger menu (three lines) used on phones: one icon button that opens a layer on top of the page listing the page's actions.
+ * Items marked hidden are left out. Choosing one closes the layer first, then runs it.
+ */
+export function PageMenu({ items, label = 'Page actions' }: { items: { label: string; icon?: keyof typeof paths; onClick: () => void; to?: string; hidden?: boolean; disabled?: boolean }[]; label?: string }) {
+  const [open, setOpen] = useState(false)
+  const shown = items.filter((i) => !i.hidden)
+  if (!shown.length) return null
+  return (
+    <>
+      <button type="button" className="lb-btn lb-btn--icon" aria-label={label} title={label} aria-haspopup="dialog" onClick={() => setOpen(true)}><Icon name="menu" /></button>
+      {open && (
+        <Dialog title={label} sheet onClose={() => setOpen(false)}>
+          <div className="lb-menulist">
+            {shown.map((i) => i.to
+              ? <a key={i.label} className="lb-menuitem" href={i.to} onClick={(e) => { e.preventDefault(); setOpen(false); i.onClick() }}>{i.icon && <Icon name={i.icon} />}{i.label}</a>
+              : <button key={i.label} type="button" className="lb-menuitem" disabled={i.disabled} onClick={() => { setOpen(false); i.onClick() }}>{i.icon && <Icon name={i.icon} />}{i.label}</button>)}
+          </div>
+        </Dialog>
+      )}
+    </>
+  )
 }
 
 /** A dropdown with ready-made choices and an "Add new" entry, so the list grows with the project. */

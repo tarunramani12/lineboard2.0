@@ -10,7 +10,7 @@ import { usePendingJoinRequests } from '../lib/joinRequests'
 import { useAccessRequests } from '../lib/accessRequests'
 import { Banner, EmptyState, Icon, Wordmark, useOnline } from './ui'
 
-export interface Ctx { b: Bundle; pid: string; uid: string }
+export interface Ctx { b: Bundle; pid: string; uid: string; joinPending: number; accessPending: number }
 
 /** What the nav shows for a section: a tag word, or a lock. */
 export function navState(b: Bundle, s: SectionDef): { locked: boolean; tag: string | null } {
@@ -27,7 +27,7 @@ export function navState(b: Bundle, s: SectionDef): { locked: boolean; tag: stri
 }
 
 /** Short names for the phone bar, where each item is narrow. */
-const DOCK_NAME: Record<string, string> = { '': 'Overview', script: 'Script', shots: 'Shots', storyboard: 'Boards', bible: 'Bible', breakdown: 'Breakdown', cast: 'Cast', props: 'Props', equipment: 'Gear', schedule: 'Schedule', callsheets: 'Call sheets', team: 'Team', export: 'Settings' }
+const DOCK_NAME: Record<string, string> = { '': 'Overview', script: 'Script', shots: 'Shots', storyboard: 'Boards', bible: 'Bible', breakdown: 'Breakdown', cast: 'Cast', locations: 'Locations', props: 'Props', equipment: 'Gear', schedule: 'Schedule', callsheets: 'Call sheets', team: 'Team', export: 'Settings' }
 
 /** Phone only: one row along the bottom that swipes sideways. The current section scrolls into view. */
 function SectionDock({ b, pid, pending }: { b: Bundle; pid: string; pending: number }) {
@@ -143,7 +143,7 @@ export default function ProjectLayout() {
   const base = `/p/${pid}`
   const seg = loc.pathname.replace(base, '').replace(/^\//, '')
   const current = SECTIONS.find((s) => s.path === seg) ?? SECTIONS[0]
-  const ctx: Ctx = { b, pid: pid!, uid: user!.id }
+  const ctx: Ctx = { b, pid: pid!, uid: user!.id, joinPending, accessPending }
 
   return (
     <>

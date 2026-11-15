@@ -4,6 +4,7 @@ import { STATUS_LABEL, formatMoney, type Item, type ItemCost, type ItemKind } fr
 import { dayEntries, formatDate, formatRange, headingParts, scenesOnAnyDay, type Placement, type Schedule, type ShootDay, type ShotPlacement } from './schedule'
 import { STATUS_TEXT, shotLabel, sizeName, type Shot } from './shots'
 import { stamp, type Block, type Report, type Paper } from './reportPdf'
+import { AVAIL_LABEL, PERMIT_LABEL, STATUSES, STATUS_LABEL as LOC_STATUS, costTotals, totalsText, type LocationsData } from './locations'
 import type { Scene, Team } from './types'
 
 const num = (s: Scene, all: Scene[]) => s.display_number ?? String(all.indexOf(s) + 1)
@@ -76,4 +77,27 @@ export function shotsReport(a: { project: string; size: Paper; scenes: Scene[]; 
     }
   })
   return { title: 'Shot list', subtitle: `${a.shots.length} shots. Storyboard pictures are in the storyboard PDF.`, meta: meta(a.project), size: a.size, blocks, footer: `${a.project}, shot list` }
+}
+
+/** Locations by status. Contact people only for those who may see them, costs only for the owner, admins and Production. */
+export function locationsReport(a: { project: string; size: Paper; data: LocationsData; scenes: Scene[]; withContacts: boolean; withCosts: boolean }): Report {
+  const sceneNums = (id: string) => (a.data.scenes.get(id) ?? []).map((l) => { const s = a.scenes.find((x) => x.id === l.scene_id); return s ? num(s, a.scenes) + (l.rank === 'alternate' ? ' (alt)' : '') : '' }).filter(Boolean).join(', ')
+  const dates = (id: string) => (a.data.avail.get(id) ?? []).map((v) => `${AVAIL_LABEL[v.kind]} ${v.start_date === v.end_date ? v.start_date : v.start_date + ' to ' + v.end_date}`).join('; ')
+  const cols = [
+    { label: 'Location', w: 18 }, { label: 'Address and details', w: 28 }, { label: 'Scenes', w: 9 }, { label: 'Dates', w: 14 },
+    ...(a.withContacts ? [{ label: 'Contact', w: 16 }] : []), ...(a.withCosts ? [{ label: 'Cost', w: 12, align: 'right' as const }] : []),
+  ]
+  const row = (id: string) => {
+    const l = a.data.locs.find((x) => x.id === id)!
+    const c = a.data.contacts.get(id)
+    const detail = [l.address, l.parking && `Parking: ${l.parking}`, l.access_restrictions && `Access: ${l.access_restrictions}`, l.hospital && `Hospital: ${l.hospital}`, l.permit_required && `Permit: ${PERMIT_LABEL[l.permit_status]}${l.permit_no ? ' ' + l.permit_no : ''}`].filter(Boolean).join('\n')
+    return [l.name + (l.kind ? `\n${l.kind}` : ''), detail, sceneNums(id), dates(id),
+      ...(a.withContacts ? [c ? [c.name, c.phone, c.email].filter(Boolean).join('\n') : ''] : []),
+      ...(a.withCosts ? [totalsText(costTotals(a.data.costs.get(id) ?? []))] : [])]
+  }
+  const blocks: Block[] = STATUSES.map((s) => ({ heading: LOC_STATUS[s], cols, rows: a.data.locs.filter((l) => l.status === s).map((l) => row(l.id)), empty: 'None.' }))
+    .filter((b) => b.rows.length > 0)
+  if (!blocks.length) blocks.push({ cols, rows: [], empty: 'No locations yet.' })
+  const sub = [a.withContacts ? '' : 'Contact people are not included.', a.withCosts ? '' : 'Costs are not included.'].filter(Boolean).join(' ')
+  return { title: 'Locations', subtitle: sub || undefined, meta: meta(a.project), size: a.size, blocks, footer: `${a.project}, locations` }
 }

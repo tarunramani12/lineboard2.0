@@ -17,6 +17,7 @@ import { shotLabel, sizeName, useShots } from '../lib/shots'
 import { armRowDrag } from '../lib/dragGate'
 import { SECTIONS } from '../lib/sections'
 import { supabase } from '../lib/supabase'
+import { blockedOn, useLocations } from '../lib/locations'
 import { ReportButton } from '../components/ReportButton'
 import { buildReportPdf, fileSafe } from '../lib/reportPdf'
 import { scheduleReport } from '../lib/reports'
@@ -236,11 +237,16 @@ export default function SchedulePage() {
   const cast = useMemo(() => (crewQ.data?.rows ?? []).filter((r) => r.kind === 'cast'), [crewQ.data])
   const unavail = useMemo(() => data.data?.unavailable ?? [], [data.data])
   const unavailKey = useMemo(() => new Set(unavail.map((u) => u.row_id + '|' + u.on_date)), [unavail])
+  const locQ = useLocations(pid)
+  const locList = useMemo(() => (locQ.data?.locs ?? []).filter((l) => l.status !== 'rejected'), [locQ.data])
   const locations = useMemo(() => {
+    const fromLocations = locList.map((l) => l.name)
     const fromBreakdown = [...(bd.data?.forms.values() ?? [])].map((f) => f.location).filter(Boolean)
     const fromDays = (data.data?.days ?? []).map((d) => d.location).filter(Boolean)
-    return [...new Set([...fromBreakdown, ...fromDays])].sort((a, b) => a.localeCompare(b))
-  }, [bd.data, data.data])
+    return [...new Set([...fromLocations.sort((a, b) => a.localeCompare(b)), ...[...new Set([...fromBreakdown, ...fromDays])].sort((a, b) => a.localeCompare(b))])]
+  }, [bd.data, data.data, locList])
+  const dayLocation = (d: ShootDay) => locList.find((l) => l.id === d.location_id) ?? locList.find((l) => l.name === d.location)
+  const locBlocked = (d: ShootDay) => { const l = dayLocation(d); return l ? blockedOn(locQ.data?.avail.get(l.id) ?? [], d.day_date) : [] }
 
   const sceneInfo = (s: Scene) => {
     const hp = headingParts(s.heading)
@@ -450,8 +456,8 @@ export default function SchedulePage() {
             build={(size) => buildReportPdf(scheduleReport({ project: b.project.name, size, schedule: sched, days, placements, shotPlacements: shotPl, shots: allShots, scenes: scenesQ.data ?? [], castOf: (s) => sceneInfo(s).names, pagesOf: (s) => { const p = sceneInfo(s).pages; return p ? eighthsLabel(p) : '' } }))} />
         )}
         {sched && (locked ? <Badge kind="locked">Locked</Badge> : canEditAny ? <Badge kind="plain">Draft</Badge> : null)}
+        {canEditAny && sched && <button type="button" className="lb-btn lb-btn--icon" aria-label={locked ? 'Unlock schedule' : 'Lock schedule'} title={locked ? 'Unlock schedule' : 'Lock schedule'} onClick={() => setDialog('lock')}><Icon name={locked ? 'unlock' : 'lock'} /></button>}
         {editor && sched && <button className="lb-btn" onClick={() => setDialog('edit')}><Icon name="pencil" /> Edit schedule</button>}
-        {canEditAny && sched && <button className="lb-btn" onClick={() => setDialog('lock')}><Icon name="lock" /> {locked ? 'Unlock schedule' : 'Lock schedule'}</button>}
         {canEditAny && <button className="lb-btn lb-btn--primary" onClick={() => setDialog('new')}><Icon name="plus" /> New schedule</button>}
       </div>
 
@@ -493,6 +499,7 @@ export default function SchedulePage() {
                     <div className="lb-spread">
                       <h2 className="lb-heading" style={{ margin: 0 }}>Day {di + 1} <span className="lb-muted">{formatDate(d.day_date, true)}</span></h2>
                       <span className="lb-row">
+                        {locBlocked(d).length > 0 && <Badge kind="stale">{dayLocation(d)?.name} is not available</Badge>}
                         <span className="lb-caption">{list.length + (partialByDay.get(d.id) ?? []).length} {list.length + (partialByDay.get(d.id) ?? []).length === 1 ? 'scene' : 'scenes'}{pagesTotal(list) ? `, ${eighthsLabel(pagesTotal(list))} pages` : ''}</span>
                         {editor && (openDel === d.id
                           ? <><button className="lb-btn lb-btn--sm lb-btn--danger" onClick={() => void deleteDay(d)}>Really delete this day</button><button className="lb-btn lb-btn--sm" onClick={() => setOpenDel(null)}>Cancel</button></>
@@ -501,7 +508,7 @@ export default function SchedulePage() {
                     </div>
                     <div className="lb-shotgrid">
                       <div className="lb-field"><label htmlFor={`loc-${d.id}`}>Location</label>
-                        {editor ? <Choice id={`loc-${d.id}`} noun="location" value={d.location} options={locations} maxLength={200} onChange={(v) => void patchDay(d, { location: v })} />
+                        {editor ? <Choice id={`loc-${d.id}`} noun="location" value={d.location} options={locations} maxLength={200} onChange={(v) => void patchDay(d, { location: v, location_id: locList.find((l) => l.name === v)?.id ?? null })} />
                           : <span className="lb-input lb-input--ro">{d.location || 'Not set'}</span>}</div>
                       <div className="lb-field"><label htmlFor={`dn-${d.id}`}>Notes</label>
                         {editor ? <DayNotes id={`dn-${d.id}`} value={d.notes} onSave={(v) => void patchDay(d, { notes: v })} /> : <span className="lb-input lb-input--ro">{d.notes || 'None'}</span>}</div>

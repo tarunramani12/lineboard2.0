@@ -1,6 +1,6 @@
 export type ProjectRole = 'owner' | 'admin' | 'member'
 export type SectionKey =
-  | 'script' | 'shots' | 'cast_crew' | 'props' | 'equipment' | 'breakdown' | 'schedule' | 'call_sheets' | 'bible'
+  | 'script' | 'shots' | 'cast_crew' | 'props' | 'equipment' | 'breakdown' | 'schedule' | 'call_sheets' | 'bible' | 'locations'
 export type AccessLevel = 'none' | 'view' | 'edit'
 export type SceneStatus = 'active' | 'omitted'
 export type SceneAccessMode = 'none' | 'selected' | 'all'

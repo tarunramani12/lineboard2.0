@@ -921,7 +921,9 @@ select.lb-input:disabled { cursor: default; opacity: .6; }
 .lb-matrix select { padding-right: 26px; background-position: calc(100% - 13px) 50%, calc(100% - 8px) 50%; }
 
 /* ---- Locations */
-.lb-map { width: 100%; border-radius: var(--radius-md); overflow: hidden; z-index: 0; background: var(--surface-sunken); }
+.lb-map { width: 100%; border-radius: var(--radius-md); overflow: hidden; z-index: 0; background: var(--surface-sunken);
+  /* Dialogs are flex columns with a maximum height. The map has nothing in normal flow, so without this it shrinks to zero height when the form is taller than the screen. */
+  flex: none; }
 .lb-pin-wrap { background: transparent; border: 0; }
 .lb-pin { display: block; width: 18px; height: 18px; margin: 2px; border-radius: 50%; background: var(--ink); border: 3px solid var(--paper); box-shadow: 0 0 0 1px var(--ink); }
 .lb-pin.is-locked { background: var(--red); }

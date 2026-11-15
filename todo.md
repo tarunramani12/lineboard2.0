@@ -27,7 +27,7 @@ The Continue with Google button shows on Sign in and Create account (`VITE_GOOGL
 Built and browser-tested 2026-11-14: database (0038, 0039 applied), page, photos with drawing, scenes, availability, costs, lock, maps, weather function deployed, call sheet blocks, PDFs, backup. Deployed, NOT committed.
 - [x] Real browser tests done 2026-11-14 (desktop and phone, live database, test accounts deleted): 16 checks on the Locations page and 10 on a two-location call sheet, weather function answered with live MET data
 - [x] Deployed 2026-11-14 (lineboard.app serves the new build)
-- [ ] Commit and push to GitHub when the owner says so
+- [x] Committed and pushed 78a5037 (2026-11-15)
 - [ ] Still to look at on a real phone: the long Locations dialog (buttons are at the bottom of a scrolling form)
 - [ ] Later: calendar download (.ics) for locations
 - [ ] Keep an eye on map use (OpenStreetMap light use): review when LineBoard has real users, move to a paid tile provider if it grows

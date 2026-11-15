@@ -72,7 +72,7 @@ Built and browser-tested 2026-11-14: database (0038, 0039 applied), page, photos
 ## Design consistency fixes (2026-11-16)
 - [x] Shared Dialog in all pages; tokens for the hard-coded colours; one pen palette; round chips and loose radii; duplicate CSS removed; heading classes and wording (deployed)
 - [x] Opaque page bar (scene list, fold all, search, zoom) on Script, Shot list and Storyboard (deployed)
-- [ ] COMMIT AND PUSH (owner asked again on 2026-11-16; see the end of summary.md for the result)
+- [x] Committed and pushed df131f4 (2026-11-16)
 - [ ] Move the repeated inline styles (CallSheets 31, TeamAccess 29, Schedule 17, Items 15) into classes
 - [ ] Owner to check on devices: the page bar on the Script, Shot list and Storyboard (phone and tablet), the pop-up windows (Escape, phone), the round chips now with small corners
 

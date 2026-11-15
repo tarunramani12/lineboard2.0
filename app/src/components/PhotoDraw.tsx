@@ -1,8 +1,8 @@
+import { PEN_COLORS } from '../lib/penColors'
 import { useEffect, useRef, useState } from 'react'
 import { MAX_STROKES, addPoint, paintFrame, type Stroke } from '../lib/storyboard'
 import { Dialog, Icon } from './ui'
 
-const COLORS = ['#d7140f', '#111111', '#1f5fd1', '#f2b33d']
 const WIDTHS = [3, 6, 12]
 
 /** The pen strokes of a photo, drawn on a transparent canvas laid over the picture (the photo file is never changed). */
@@ -32,7 +32,7 @@ export default function PhotoDraw({ url, strokes: initial, canEdit, busy, error,
   url: string; strokes: Stroke[]; canEdit: boolean; busy: boolean; error: string | null; onSave: (s: Stroke[]) => void; onClose: () => void
 }) {
   const [strokes, setStrokes] = useState<Stroke[]>(initial)
-  const [color, setColor] = useState(COLORS[0])
+  const [color, setColor] = useState(PEN_COLORS[1])
   const [width, setWidth] = useState(WIDTHS[1])
   const [tool, setTool] = useState<'pen' | 'eraser'>('pen')
   const [size, setSize] = useState<{ w: number; h: number } | null>(null)
@@ -86,7 +86,7 @@ export default function PhotoDraw({ url, strokes: initial, canEdit, busy, error,
             <button type="button" aria-pressed={tool === 'eraser'} onClick={() => setTool('eraser')}>Eraser</button>
           </div>
           <span className="lb-row" role="group" aria-label="Colour" style={{ gap: 6 }}>
-            {COLORS.map((c) => <button key={c} type="button" className={'lb-swatch' + (color === c && tool === 'pen' ? ' is-on' : '')} style={{ background: c }} aria-label={`Colour ${c}`} aria-pressed={color === c} onClick={() => { setColor(c); setTool('pen') }} />)}
+            {PEN_COLORS.map((c) => <button key={c} type="button" className={'lb-swatch' + (color === c && tool === 'pen' ? ' is-on' : '')} style={{ background: c }} aria-label={`Colour ${c}`} aria-pressed={color === c} onClick={() => { setColor(c); setTool('pen') }} />)}
           </span>
           <div className="lb-seg" role="group" aria-label="Width">
             {WIDTHS.map((w, i) => <button key={w} type="button" aria-pressed={width === w} onClick={() => setWidth(w)}>{['Thin', 'Medium', 'Thick'][i]}</button>)}

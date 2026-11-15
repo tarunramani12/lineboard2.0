@@ -3,7 +3,7 @@ import { AccessRequestsPanel, ScheduleDrafts } from '../components/AccessRequest
 import { useOutletContext } from 'react-router-dom'
 import { useQuery, useQueryClient } from '@tanstack/react-query'
 import type { Ctx } from '../components/ProjectLayout'
-import { Badge, Dialog, EmptyState, Field, Icon, Permission, rowOpen, useAction } from '../components/ui'
+import { Badge, Dialog, EmptyState, Field, Icon, rowOpen, useAction } from '../components/ui'
 import { friendlyError } from '../lib/errors'
 import { kickEmail } from '../lib/email'
 import { usePendingJoinRequests, type PendingJoinRequest } from '../lib/joinRequests'
@@ -13,6 +13,7 @@ import {
 import { SECTION_KEYS, SECTION_LABELS } from '../lib/sections'
 import { supabase } from '../lib/supabase'
 import type { AccessLevel, SceneAccessMode, Team } from '../lib/types'
+import { PageHeader } from '../components/PageHeader'
 
 const fmt = (iso: string) => new Date(iso).toLocaleDateString(undefined, { day: 'numeric', month: 'short', year: 'numeric' })
 
@@ -35,7 +36,7 @@ export default function TeamAccess() {
   if (teams.length === 0) {
     return (
       <>
-        <div className="lb-page-head"><h1 className="lb-title">Team and access</h1><Permission level="locked" why="No access" /></div>
+        <PageHeader title="Team and access" />
         <EmptyState title="Team and access is for the admins and heads of department">
           Ask the admin to make you head of department if you need to add people to a team.
         </EmptyState>
@@ -44,11 +45,7 @@ export default function TeamAccess() {
   }
   return (
     <>
-      <div className="lb-page-head">
-        <h1 className="lb-title">Team and access</h1>
-        <Permission level="edit" team={admin ? 'Admins' : 'Your team'} />
-      </div>
-      {!admin && <p className="lb-caption">You manage your own team. The admin sets what each team can see and who reads which scenes.</p>}
+      <PageHeader title="Team and access" info={<span>{teams.length} {teams.length === 1 ? 'team' : 'teams'}</span>} />
       <JoinRequests pid={pid} />
       <AccessRequestsPanel b={b} pid={pid} />
       {teams.map((t) => <TeamCard key={t.id} team={t} b={b} pid={pid} invites={ic.data?.invites ?? []} codes={ic.data?.codes ?? []} />)}

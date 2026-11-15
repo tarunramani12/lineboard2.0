@@ -6,6 +6,7 @@ import { useCallSheets, canEditSheets } from '../lib/callsheets'
 import { isOwner, levelFor, useScenes } from '../lib/project'
 import { dayEntries, formatDate, toIso, useScheduleData } from '../lib/schedule'
 import { useShots } from '../lib/shots'
+import { PageHeader } from '../components/PageHeader'
 
 /** The basics of the project, the coming shoot days with their call sheets, and anything waiting for this person. */
 export default function Overview() {
@@ -37,10 +38,7 @@ export default function Overview() {
 
   return (
     <>
-      <div className="lb-page-head">
-        <h1 className="lb-title">Overview</h1>
-        {b.project.script_locked ? <Badge kind="locked">Script locked</Badge> : <Badge kind="plain">Script unlocked</Badge>}
-      </div>
+      <PageHeader title="Overview" info={b.project.script_locked ? <Badge kind="locked">Script locked</Badge> : <Badge kind="plain">Script unlocked</Badge>} />
 
       <section className="lb-box lb-stack" aria-label="Notifications" style={{ padding: 16 }}>
         <h2 className="lb-heading" style={{ margin: 0 }}>Notifications {notes.length > 0 && <span className="lb-tag lb-tag--new">{notes.length} NEW</span>}</h2>

@@ -2,7 +2,8 @@ import { useEffect, useMemo, useState } from 'react'
 import { Link, useOutletContext, useSearchParams } from 'react-router-dom'
 import { useQueryClient } from '@tanstack/react-query'
 import { navState, type Ctx } from '../components/ProjectLayout'
-import { Badge, Banner, EmptyState, Icon, Permission, SceneChip } from '../components/ui'
+import { PageHeader } from '../components/PageHeader'
+import { Badge, Banner, EmptyState, Icon, SceneChip } from '../components/ui'
 import { useBreakdown } from '../lib/breakdown'
 import { useCastCrew } from '../lib/castcrew'
 import { callSheetPdf } from '../lib/callsheetPdf'
@@ -33,7 +34,6 @@ export default function CallSheetsPage() {
   const qc = useQueryClient()
   const def = SECTIONS.find((s) => s.path === 'callsheets')!
   const st = navState(b, def)
-  const level = levelFor(b, 'call_sheets')
   const editor = canEditSheets(b)
   const [sp, setSp] = useSearchParams()
   const dayId = sp.get('day')
@@ -106,12 +106,7 @@ export default function CallSheetsPage() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [day, current, days, draft, active, sched.data, shotsQ.data, bd.data, crewQ.data, texts.data, b.project.name, dayScenes, locQ.data, weather])
 
-  const head = (
-    <div className="lb-page-head">
-      <h1 className="lb-title">Call sheets</h1>
-      {st.locked ? <Permission level="locked" why="No access" /> : <Permission level={level === 'edit' ? 'edit' : 'view'} />}
-    </div>
-  )
+  const head = <PageHeader title="Call sheets" />
   if (st.locked) {
     return (<>{head}<EmptyState title="Call sheets are not open to your team" action={levelFor(b, 'call_sheets') === 'edit' ? undefined : <Link className="lb-btn" to="../team">Open Team and access</Link>}>The admin can change this in Team and access.</EmptyState></>)
   }
@@ -123,19 +118,18 @@ export default function CallSheetsPage() {
     const visible = days.filter((d) => editor || (published(d.id)?.rev_no ?? 0) > 0)
     return (
       <>
-        {head}
-        <p className="lb-caption lb-phone-hide">One call sheet for each shoot day. Production and the AD team write and publish it. Everyone with access to Call sheets reads the published version.</p>
+        <PageHeader title="Call sheets"
+          info={current ? <span>{current.name}, {formatRange(current.start_date, current.end_date)}</span> : undefined}
+          quick={schedules.length > 1 ? (
+            <select className="lb-input" style={{ width: 'auto' }} aria-label="Schedule" value={current?.id ?? ''} onChange={(e) => choose(e.target.value)}>{schedules.map((sc) => <option key={sc.id} value={sc.id}>{sc.name}</option>)}</select>
+          ) : undefined} />
         {!b.project.script_locked && editor && <Banner lead="The script is not locked.">Scene numbers can still change. Lock the script before you publish, so the sheet and the scenes agree.</Banner>}
-        {schedules.length > 1 && (
-          <div className="lb-row"><select className="lb-input" style={{ width: 'auto' }} aria-label="Schedule" value={current?.id ?? ''} onChange={(e) => choose(e.target.value)}>{schedules.map((s) => <option key={s.id} value={s.id}>{s.name}</option>)}</select></div>
-        )}
         {sched.isLoading || sheetsQ.isLoading ? <p className="lb-caption" role="status">Loading</p> : !current ? (
-          <EmptyState title="No schedule yet" action={<Link className="lb-btn lb-btn--primary" to="../schedule">Open Schedule</Link>}>A call sheet is made for a shoot day. Create a schedule and add shoot days first.</EmptyState>
+          <EmptyState title="No schedule yet" action={<Link className="lb-btn lb-btn--primary" to="../schedule">Open the Schedule</Link>}>A call sheet is made for a shoot day. Create a schedule and add shoot days first.</EmptyState>
         ) : visible.length === 0 ? (
           <EmptyState title={editor ? 'No shoot days yet' : 'No call sheets have been published yet'}>{editor ? 'Add shoot days in Schedule, then start a call sheet for each.' : 'When Production or the AD team publishes a call sheet it appears here.'}</EmptyState>
         ) : (
           <div className="lb-stack">
-            <span className="lb-caption">{current.name}, {formatRange(current.start_date, current.end_date)}</span>
             {visible.map((d) => {
               const i = days.indexOf(d); const s = published(d.id); const rv = s ? sheetsQ.data?.revisions.get(s.id) : undefined
               const n = sceneIdsOfDay(d.id).length
@@ -211,8 +205,18 @@ export default function CallSheetsPage() {
   const s = showing
   return (
     <>
-      {head}
-      <div className="lb-row"><button className="lb-btn" onClick={() => setSp({})}>All shoot days</button></div>
+      <PageHeader title="Call sheets"
+        info={sheet && s ? <><span>Shoot day <b>{s.day_no}</b> of {s.day_count}, {formatDate(s.date, true)}</span>{shownRev ? <Badge kind="revised">Revision {shownRev.rev_no}</Badge> : <Badge kind="stale">{editor ? (latest ? 'Working copy' : 'Draft') : 'Draft'}</Badge>}</> : undefined}
+        menu={sheet && s ? [{ label: 'Download PDF', icon: 'download', disabled: busy, onClick: () => void pdf('a4') }] : undefined}
+        quick={<>
+          <button className="lb-btn" onClick={() => setSp({})}>All shoot days</button>
+          {sheet && s && revs.length > 0 && (
+            <select className="lb-input" style={{ width: 'auto' }} aria-label="Revision" value={String(view === 'live' && !editor ? latest!.rev_no : view)} onChange={(e) => setView(e.target.value === 'live' ? 'live' : Number(e.target.value))}>
+              {editor && <option value="live">Working copy</option>}
+              {[...revs].reverse().map((r) => <option key={r.id} value={r.rev_no}>Revision {r.rev_no}, {when(r.published_at)}</option>)}
+            </select>
+          )}
+        </>} />
       {error && <p className="lb-error" role="alert">{error}</p>}
       {!sheet && !editor && <EmptyState title="This call sheet has not been published">When it is published it appears here.</EmptyState>}
       {!sheet && editor && (
@@ -239,16 +243,6 @@ export default function CallSheetsPage() {
               {!latest ? 'Nobody else can see this call sheet until you publish it.' : unpublished ? 'Changed lines are marked below. Publish to send a new revision.' : ''}
             </Banner>
           )}
-          <div className="lb-row">
-            {revs.length > 0 && (
-              <select className="lb-input" style={{ width: 'auto' }} aria-label="Revision" value={String(view === 'live' && !editor ? latest!.rev_no : view)} onChange={(e) => setView(e.target.value === 'live' ? 'live' : Number(e.target.value))}>
-                {editor && <option value="live">Working copy</option>}
-                {[...revs].reverse().map((r) => <option key={r.id} value={r.rev_no}>Revision {r.rev_no}, {when(r.published_at)}</option>)}
-              </select>
-            )}
-            <span style={{ flex: 1 }} />
-            <button className="lb-btn" disabled={busy} onClick={() => void pdf('a4')}>Download PDF</button>
-          </div>
 
           {editor && view === 'live' && (
             <section className="lb-card lb-stack" style={{ padding: 16 }} aria-label="Details">

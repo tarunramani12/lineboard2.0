@@ -8,7 +8,7 @@ import ProjectLayout from './components/ProjectLayout'
 import Overview from './pages/Overview'
 import Script from './pages/Script'
 import ImportScript from './pages/ImportScript'
-import ShotList from './pages/ShotList'
+import Shots from './pages/Shots'
 import Bible from './pages/Bible'
 import Breakdown from './pages/Breakdown'
 import CastCrew from './pages/CastCrew'
@@ -16,7 +16,6 @@ import Locations from './pages/Locations'
 import SchedulePage from './pages/Schedule'
 import { EquipmentPage, PropsPage } from './pages/Items'
 import CallSheetsPage from './pages/CallSheets'
-import Storyboard from './pages/Storyboard'
 import TeamAccess from './pages/TeamAccess'
 import { ExportSettings, SectionPage } from './pages/Sections'
 import { Privacy, Terms } from './pages/Legal'
@@ -46,8 +45,8 @@ export default function App() {
               <Route path="script" element={<Script />} />
               <Route path="script/import" element={<ImportScript />} />
               <Route path="scenes" element={<Navigate to="../script" replace />} />
-              <Route path="shots" element={<ShotList />} />
-              <Route path="storyboard" element={<Storyboard />} />
+              <Route path="shots" element={<Shots />} />
+              <Route path="storyboard" element={<Navigate to="../shots" replace />} />   {/* the storyboard is part of Shots now */}
               <Route path="bible" element={<Bible />} />
               <Route path="breakdown" element={<Breakdown />} />
               <Route path="cast" element={<CastCrew />} />

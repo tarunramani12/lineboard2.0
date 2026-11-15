@@ -2,7 +2,7 @@ import { useEffect, useMemo, useState } from 'react'
 import { Link, useOutletContext } from 'react-router-dom'
 import { useQueryClient } from '@tanstack/react-query'
 import { navState, type Ctx } from '../components/ProjectLayout'
-import { Badge, Banner, Choice, Dialog as TitleDialog, EmptyState, Icon, Permission, SceneChip, useAction } from '../components/ui'
+import { Badge, Banner, Choice, Dialog as TitleDialog, EmptyState, Icon, SceneChip, useAction, Dialog } from '../components/ui'
 import { useBreakdown } from '../lib/breakdown'
 import { canEditCrewFor, displayName, useCastCrew, type CrewRow } from '../lib/castcrew'
 import { estimateLines } from '../lib/fountain'
@@ -18,26 +18,14 @@ import { armRowDrag } from '../lib/dragGate'
 import { SECTIONS } from '../lib/sections'
 import { supabase } from '../lib/supabase'
 import { blockedOn, useLocations } from '../lib/locations'
-import { ReportButton } from '../components/ReportButton'
+import { useReportDownload } from '../components/ReportButton'
+import { PageHeader } from '../components/PageHeader'
 import { buildReportPdf, fileSafe } from '../lib/reportPdf'
 import { scheduleReport } from '../lib/reports'
 import type { Scene } from '../lib/types'
 
 const errText = (e: unknown) => (e instanceof Error && !('code' in e) ? e.message : friendlyError(e))
 const LAST_KEY = 'lineboard.schedule.'
-
-function Dialog({ label, onClose, children }: { label: string; onClose: () => void; children: React.ReactNode }) {
-  useEffect(() => {
-    const h = (e: KeyboardEvent) => { if (e.key === 'Escape') onClose() }
-    document.addEventListener('keydown', h)
-    return () => document.removeEventListener('keydown', h)
-  }, [onClose])
-  return (
-    <div className="lb-scrim" onMouseDown={(e) => { if (e.target === e.currentTarget) onClose() }}>
-      <div className="lb-dialog" role="dialog" aria-modal="true" aria-label={label}>{children}</div>
-    </div>
-  )
-}
 
 /** Every date from first to last, optionally leaving out Saturdays and Sundays. */
 function datesBetween(a: string, b: string, skipWeekends: boolean): string[] {
@@ -100,7 +88,7 @@ function ScheduleDialog({ pid, sched, days, usedDayIds, onClose, onSaved, onDele
     } catch (e) { setError(errText(e)) } finally { setBusy(false) }
   }
   return (
-    <Dialog label={sched ? 'Edit schedule' : 'New schedule'} onClose={onClose}>
+    <Dialog bare title={sched ? 'Edit schedule' : 'New schedule'} onClose={onClose}>
       <h2 className="lb-heading" style={{ margin: 0 }}>{sched ? 'Edit schedule' : 'New schedule'}</h2>
       <div className="lb-field"><label htmlFor="sc-name">Name</label><input id="sc-name" className="lb-input" value={name} maxLength={80} autoFocus onChange={(e) => setName(e.target.value)} placeholder="Block 1" /></div>
       <div className="lb-shotgrid">
@@ -143,7 +131,7 @@ function UnavailableDialog({ pid, cast, onClose, onSaved, canEditRow }: { pid: s
     } catch (e) { setError(errText(e)) } finally { setBusy(false) }
   }
   return (
-    <Dialog label="Mark cast unavailable" onClose={onClose}>
+    <Dialog bare title="Mark cast unavailable" onClose={onClose}>
       <h2 className="lb-heading" style={{ margin: 0 }}>Mark cast unavailable</h2>
       {choices.length === 0 ? <p>There is no cast member you can mark. Add cast in Cast and crew first.</p> : (
         <>
@@ -195,7 +183,6 @@ export default function SchedulePage() {
   const qc = useQueryClient()
   const def = SECTIONS.find((s) => s.path === 'schedule')!
   const st = navState(b, def)
-  const level = levelFor(b, 'schedule')
   const canEditAny = canEditSchedule(b)   // may edit the Schedule section; a locked schedule is still not editable by anyone
   const data = useScheduleData(pid)
   const scenesQ = useScenes(pid)
@@ -262,16 +249,11 @@ export default function SchedulePage() {
   }
   const allConflicts = days.flatMap((d) => [...(byDay.get(d.id) ?? []), ...(partialByDay.get(d.id) ?? []).map((e) => sceneById.get(e.scene_id)).filter((x): x is Scene => Boolean(x))].flatMap((s) => conflictsFor(s, d.day_date).map((c) => ({ day: d, scene: s, who: c }))))
 
-  const head = (
-    <div className="lb-page-head">
-      <h1 className="lb-title">Schedule</h1>
-      {st.locked ? <Permission level="locked" why="No access" /> : <Permission level={level === 'edit' ? 'edit' : 'view'} />}
-    </div>
-  )
+  const pdf = useReportDownload(sched ? `${fileSafe(b.project.name)}-schedule-${fileSafe(sched.name)}` : 'schedule', (size) => sched ? (buildReportPdf(scheduleReport({ project: b.project.name, size, schedule: sched, days, placements, shotPlacements: shotPl, shots: allShots, scenes: scenesQ.data ?? [], castOf: (s) => sceneInfo(s).names, pagesOf: (s) => { const p = sceneInfo(s).pages; return p ? eighthsLabel(p) : '' } }))) : Promise.reject(new Error('No schedule yet.')))
   if (st.locked) {
     return (
       <>
-        {head}
+        <PageHeader title="Schedule" />
         <EmptyState title="Schedule is not open to your team" action={levelFor(b, 'schedule') === 'edit' ? undefined : <Link className="lb-btn" to="../team">Open Team and access</Link>}>The admin can change this in Team and access.</EmptyState>
       </>
     )
@@ -441,25 +423,21 @@ export default function SchedulePage() {
 
   return (
     <>
-      {head}
-      <p className="lb-caption lb-phone-hide">A schedule is a block of shoot days. A shoot day is made for every date in the schedule. Put each scene on the day it will be shot. Open a scene's shots to send some of them to a different day. Delete the days you will not shoot. Production and the AD team edit it by default. The admin can change that in Team and access.</p>
-      {error && <p className="lb-error" role="alert">{error}</p>}
-      <div className="lb-row">
-        {schedules.length > 1 && (
+      <PageHeader title="Schedule"
+        info={sched ? <>{locked ? <Badge kind="locked">Locked</Badge> : canEditAny ? <Badge kind="plain">Draft</Badge> : null}<span>{sched.name}, {formatRange(sched.start_date, sched.end_date)}</span></> : undefined}
+        menu={[
+          { label: 'New schedule', icon: 'plus', hidden: !canEditAny, onClick: () => setDialog('new') },
+          { label: 'Edit schedule', icon: 'pencil', hidden: !(editor && sched), onClick: () => setDialog('edit') },
+          { label: locked ? 'Unlock schedule' : 'Lock schedule', icon: locked ? 'unlock' : 'lock', hidden: !(canEditAny && sched), onClick: () => setDialog('lock') },
+          { label: 'Download schedule PDF', icon: 'download', hidden: !sched, disabled: pdf.busy, onClick: () => void pdf.go() },
+        ]}
+        quick={schedules.length > 1 ? (
           <select className="lb-input" style={{ width: 'auto', maxWidth: '100%' }} aria-label="Schedule" value={sched?.id ?? ''} onChange={(e) => choose(e.target.value)}>
-            {schedules.map((s) => <option key={s.id} value={s.id}>{s.name}</option>)}
+            {schedules.map((sc) => <option key={sc.id} value={sc.id}>{sc.name}</option>)}
           </select>
-        )}
-        <span style={{ flex: 1 }} />
-        {sched && (
-          <ReportButton label="Download schedule PDF" file={`${fileSafe(b.project.name)}-schedule-${fileSafe(sched.name)}`}
-            build={(size) => buildReportPdf(scheduleReport({ project: b.project.name, size, schedule: sched, days, placements, shotPlacements: shotPl, shots: allShots, scenes: scenesQ.data ?? [], castOf: (s) => sceneInfo(s).names, pagesOf: (s) => { const p = sceneInfo(s).pages; return p ? eighthsLabel(p) : '' } }))} />
-        )}
-        {sched && (locked ? <Badge kind="locked">Locked</Badge> : canEditAny ? <Badge kind="plain">Draft</Badge> : null)}
-        {canEditAny && sched && <button type="button" className="lb-btn lb-btn--icon" aria-label={locked ? 'Unlock schedule' : 'Lock schedule'} title={locked ? 'Unlock schedule' : 'Lock schedule'} onClick={() => setDialog('lock')}><Icon name={locked ? 'unlock' : 'lock'} /></button>}
-        {editor && sched && <button className="lb-btn" onClick={() => setDialog('edit')}><Icon name="pencil" /> Edit schedule</button>}
-        {canEditAny && <button className="lb-btn lb-btn--primary" onClick={() => setDialog('new')}><Icon name="plus" /> New schedule</button>}
-      </div>
+        ) : undefined} />
+      {error && <p className="lb-error" role="alert">{error}</p>}
+      {pdf.error && <p className="lb-error" role="alert">{pdf.error}</p>}
 
       {data.isLoading && <p className="lb-caption" role="status">Loading the schedule…</p>}
       {!data.isLoading && !sched && <EmptyState title="No schedule yet">{canEditAny ? 'Create a schedule for a block of shoot days. A film with one shoot has one schedule.' : 'The production team shares the schedule here once it is locked.'}</EmptyState>}

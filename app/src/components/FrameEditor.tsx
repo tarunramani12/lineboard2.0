@@ -1,65 +1,31 @@
-import { useEffect, useMemo, useRef, useState } from 'react'
-import { Link, useOutletContext } from 'react-router-dom'
-import { useQueryClient } from '@tanstack/react-query'
-import { navState, type Ctx } from '../components/ProjectLayout'
-import { Badge, Banner, EmptyState, Icon, Permission, SceneChip, useOnline } from '../components/ui'
+import { useEffect, useRef, useState } from 'react'
+import { Badge, Icon } from './ui'
 import { friendlyError } from '../lib/errors'
-import { useFolded } from '../lib/folded'
-import { FoldAll } from '../components/FoldAll'
-import { Mark, SceneFind, useSceneFind } from '../components/SceneFind'
-import { matchScene } from '../lib/sceneSearch'
-import { isOwnerOrAdmin, levelFor, useScenes } from '../lib/project'
-import { SECTIONS } from '../lib/sections'
-import { canEditShotsFor, shotLabel, useShots, type Shot } from '../lib/shots'
+import { PEN_COLORS, PEN_DEFAULT } from '../lib/penColors'
+import { type Shot } from '../lib/shots'
 import {
-  BUCKET, ImageProblem, MAX_LAYERS, MAX_STROKES, addPoint, drawContain, compressImage, flatten, framePaths, gridCells,
-  loadImage, mb, paintFrame, removeFiles, totalBytes, uploadImage, useFrames, useSignedUrls,
-  toDraw, type DrawLayer, type Frame, type Layer, type Stroke,
+  ImageProblem, MAX_LAYERS, MAX_STROKES, addPoint, compressImage, flatten, framePaths, loadImage, mb, paintFrame, removeFiles, uploadImage,
+  type DrawLayer, type Frame, type Layer, type Stroke,
 } from '../lib/storyboard'
 import { supabase } from '../lib/supabase'
-import { cssRatio, ratioValue, stageSize } from '../lib/aspect'
+import { cssRatio, stageSize } from '../lib/aspect'
 import type { Scene } from '../lib/types'
 
-const COLORS = ['#111111', '#d11a1a', '#1f5fd1']
 const WIDTHS = [3, 6, 12]
 
-/** A small picture of a frame: the flattened image when it is done, otherwise the layers and drawing painted on the spot. */
-function FrameThumb({ frame, urls, offline, ratio }: { frame: Frame | undefined; urls: Map<string, string> | undefined; offline: boolean; ratio: string }) {
-  const rs = { aspectRatio: cssRatio(ratio) }
-  const sz = stageSize(ratio); const tw = 480, th = Math.max(1, Math.round(tw * sz.h / sz.w))
-  const ref = useRef<HTMLCanvasElement>(null)
-  const [failed, setFailed] = useState(false)
-  const flatUrl = frame?.done && frame.flat_path ? urls?.get(frame.flat_path) : undefined
-  useEffect(() => {
-    setFailed(false)
-    if (!frame || frame.done || !urls) return
-    let live = true
-    const c = ref.current; if (!c) return
-    const ctx = c.getContext('2d')!
-    paintFrame(ctx, c.width, c.height, [], frame.strokes)
-    Promise.all(frame.layers.map(async (l) => {
-      const img = await loadImage(urls.get(l.path) ?? '')
-      return toDraw(l, img, img.naturalWidth, img.naturalHeight)
-    })).then((ls) => { if (live) paintFrame(ctx, c.width, c.height, ls, frame.strokes) }).catch(() => { if (live) setFailed(true) })
-    return () => { live = false }
-  }, [frame, urls])
-  if (!frame) return <div className="lb-frame lb-frame--empty" style={rs}><span className="lb-caption">No frame yet</span></div>
-  if (offline || failed) return <div className="lb-frame lb-frame--empty" style={rs}><Icon name="cloudoff" /><span className="lb-caption">{offline ? 'Offline. Frames are blank.' : 'The picture did not load.'}</span></div>
-  if (frame.done) return flatUrl ? <img className="lb-frame" style={rs} src={flatUrl} alt="Finished frame" loading="lazy" /> : <div className="lb-frame lb-frame--empty" style={rs}><span className="lb-caption">Loading</span></div>
-  return <canvas ref={ref} className="lb-frame" style={rs} width={tw} height={th} aria-label="Frame sketch" />
-}
-
 interface EditorProps {
-  shot: Shot; label: string; scene: Scene; frame: Frame | undefined; canEdit: boolean
+  shot: Shot; scene: Scene; frame: Frame | undefined; canEdit: boolean
   urls: Map<string, string> | undefined; usedByOthers: number; capBytes: number; showUsage: boolean
   pid: string; ratio: string; onClose: () => void; onSaved: () => void
+  /** The dialog around the editor calls this to close it the right way (it gives back files uploaded in the session). */
+  closeRef?: { current: (() => void) | null }
 }
 
-function FrameEditor({ shot, label, scene, frame, canEdit, urls, usedByOthers, capBytes, showUsage, pid, ratio, onClose, onSaved }: EditorProps) {
+export function FrameEditor({ shot, scene, frame, canEdit, urls, usedByOthers, capBytes, showUsage, pid, ratio, onClose, onSaved, closeRef }: EditorProps) {
   const stage = stageSize(ratio)
   const [layers, setLayers] = useState<Layer[]>(frame?.layers ?? [])
   const [strokes, setStrokes] = useState<Stroke[]>(frame?.strokes ?? [])
-  const [color, setColor] = useState(COLORS[0])
+  const [color, setColor] = useState(PEN_DEFAULT)
   const [width, setWidth] = useState(WIDTHS[1])
   const [tool, setTool] = useState<'pen' | 'eraser' | 'move'>('pen')
   const [sel, setSel] = useState(0)            // the photo layer the Move tool drags
@@ -97,18 +63,12 @@ function FrameEditor({ shot, label, scene, frame, canEdit, urls, usedByOthers, c
     paintFrame(c.getContext('2d')!, c.width, c.height, ls, strokes)
   }, [layers, strokes, imgs, isDone])
 
-  useEffect(() => {
-    const h = (e: KeyboardEvent) => { if (e.key === 'Escape') close() }
-    document.addEventListener('keydown', h)
-    return () => document.removeEventListener('keydown', h)
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  })
-
   /** Leave without saving: give back files uploaded in this session that the frame does not use. */
   function close() {
     if (!saved.current && uploaded.current.length) void removeFiles(uploaded.current)
     onClose()
   }
+  useEffect(() => { if (closeRef) closeRef.current = close })
 
   async function addPhoto(file: File | undefined) {
     if (!file) return
@@ -235,13 +195,11 @@ function FrameEditor({ shot, label, scene, frame, canEdit, urls, usedByOthers, c
 
   const used = usedByOthers + bytes
   return (
-    <div className="lb-scrim" onMouseDown={(e) => { if (e.target === e.currentTarget) close() }}>
-      <div className="lb-dialog lb-dialog--wide" role="dialog" aria-modal="true" aria-label={`Frame for shot ${label}`}>
+    <>
         <div className="lb-spread">
-          <h2 className="lb-heading" style={{ margin: 0 }}>Frame for shot {label}</h2>
+          <span className="lb-caption">{scene.heading || 'No heading yet'} · {shot.description || 'No description'}</span>
           {isDone ? <Badge kind="plain"><Icon name="check" /> Done</Badge> : <Badge kind="plain">Sketch</Badge>}
         </div>
-        <p className="lb-caption">{scene.heading || 'No heading yet'} · {shot.description || 'No description'}</p>
 
         {isDone ? (
           flatUrl ? <img className="lb-stage" style={{ aspectRatio: cssRatio(ratio), objectFit: 'contain' }} src={flatUrl} alt="Finished frame" /> : <div className="lb-stage lb-stage--empty" style={{ aspectRatio: cssRatio(ratio) }}>Loading</div>
@@ -258,7 +216,7 @@ function FrameEditor({ shot, label, scene, frame, canEdit, urls, usedByOthers, c
                 <button type="button" aria-pressed={tool === 'eraser'} aria-current={tool === 'eraser' ? 'true' : undefined} onClick={() => setTool('eraser')}>Eraser</button>
                 <button type="button" aria-pressed={tool === 'move'} aria-current={tool === 'move' ? 'true' : undefined} disabled={!layers.length} onClick={() => setTool('move')}>Move photo</button>
               </div>
-              {COLORS.map((c) => <button key={c} className="lb-swatch" aria-label={`Pen colour ${c}`} aria-pressed={color === c && tool === 'pen'} style={{ background: c }} onClick={() => { setColor(c); setTool('pen') }} />)}
+              {PEN_COLORS.map((c) => <button key={c} className="lb-swatch" aria-label={`Pen colour ${c}`} aria-pressed={color === c && tool === 'pen'} style={{ background: c }} onClick={() => { setColor(c); setTool('pen') }} />)}
               {WIDTHS.map((w) => <button key={w} className="lb-btn lb-btn--sm" aria-pressed={width === w} onClick={() => setWidth(w)}>{w === 3 ? 'Thin' : w === 6 ? 'Medium' : 'Thick'}</button>)}
               <button className="lb-btn lb-btn--sm" disabled={!strokes.length} onClick={() => setStrokes((s) => s.slice(0, -1))}>Undo</button>
               <button className="lb-btn lb-btn--sm" disabled={!strokes.length} onClick={() => setStrokes([])}>Clear drawing</button>
@@ -301,193 +259,6 @@ function FrameEditor({ shot, label, scene, frame, canEdit, urls, usedByOthers, c
             {canEdit && !isDone && <button className="lb-btn lb-btn--primary" disabled={busy || Boolean(working)} onClick={markDone}><Icon name="check" /> Mark done</button>}
           </span>
         </div>
-      </div>
-    </div>
-  )
-}
-
-export default function Storyboard() {
-  const { b, pid } = useOutletContext<Ctx>()
-  const fold = useFolded(pid, 'storyboard')
-  const find = useSceneFind()
-  const isOpen = (id: string) => (find.q ? true : fold.isOpen(id))   // a search opens what it finds without touching the saved choice
-  const qc = useQueryClient()
-  const online = useOnline()
-  const scenes = useScenes(pid).data ?? []
-  const shots = useShots(pid).data ?? []
-  const framesQ = useFrames(pid)
-  const frames = useMemo(() => framesQ.data ?? new Map<string, Frame>(), [framesQ.data])
-  const paths = useMemo(() => [...frames.values()].flatMap(framePaths), [frames])
-  const urls = useSignedUrls(paths).data
-  const def = SECTIONS.find((s) => s.path === 'storyboard')!
-  const st = navState(b, def)
-  const level = levelFor(b, 'shots')
-  const [open, setOpen] = useState<string | null>(null)
-  const [capEdit, setCapEdit] = useState<string | null>(null)
-  const [error, setError] = useState<string | null>(null)
-  const [exporting, setExporting] = useState(false)
-
-  const capMb = b.project.image_cap_mb ?? 200
-  const ratio = b.project.aspect_ratio ?? '16:9'
-  const used = totalBytes(frames.values())
-  const pct = Math.min(100, (used / (capMb * 1048576)) * 100)
-  const refresh = () => { void qc.invalidateQueries({ queryKey: ['frames', pid] }); void qc.invalidateQueries({ queryKey: ['signed'] }) }
-
-  const bySceneId = useMemo(() => {
-    const m = new Map<string, Shot[]>()
-    for (const s of shots) m.set(s.scene_id, [...(m.get(s.scene_id) ?? []), s])
-    return m
-  }, [shots])
-
-  async function saveCap() {
-    const n = Number(capEdit)
-    if (!Number.isFinite(n) || n < 10 || n > 5000) { setError('Choose a limit between 10 and 5000 MB.'); return }
-    setError(null)
-    const { error: e } = await supabase.from('projects').update({ image_cap_mb: Math.round(n) }).eq('id', pid)
-    if (e) { setError(friendlyError(e)); return }
-    setCapEdit(null); void qc.invalidateQueries({ queryKey: ['project', pid] })
-  }
-
-  async function exportPdf() {
-    setExporting(true); setError(null)
-    try {
-      const { jsPDF } = await import('jspdf')
-      const doc = new jsPDF({ unit: 'pt', format: 'a4', orientation: 'landscape' })
-      const cells = gridCells(842, 595, 36, 3, 2, 14)
-      const pdfSz = stageSize(ratio); const pdfW = Math.round(pdfSz.w * 0.75), pdfH = Math.round(pdfSz.h * 0.75)
-      const all = scenes.flatMap((sc, si) => (bySceneId.get(sc.id) ?? []).map((s, i) => ({ sc, si, s, n: i + 1 })))
-      const u = new Map<string, string>()
-      if (paths.length) {
-        const { data } = await supabase.storage.from(BUCKET).createSignedUrls(paths, 600)
-        for (const d of data ?? []) u.set(d.path ?? '', d.signedUrl ?? '')
-      }
-      for (let i = 0; i < all.length; i++) {
-        if (i > 0 && i % 6 === 0) doc.addPage()
-        const cell = cells[i % 6]
-        const { sc, si, s, n } = all[i]
-        const f = frames.get(s.id)
-        const imgH = cell.h - 34
-        doc.setDrawColor(190); doc.rect(cell.x, cell.y, cell.w, imgH)
-        if (f) {
-          try {
-            const ls: DrawLayer[] = f.done ? [] : await Promise.all(f.layers.map(async (l) => { const im = await loadImage(u.get(l.path) ?? ''); return toDraw(l, im, im.naturalWidth, im.naturalHeight) }))
-            const c = document.createElement('canvas'); c.width = pdfW; c.height = pdfH
-            const ctx = c.getContext('2d')!
-            if (f.done && f.flat_path) { const im = await loadImage(u.get(f.flat_path) ?? ''); drawContain(ctx, im, pdfW, pdfH) } else paintFrame(ctx, pdfW, pdfH, ls, f.strokes)
-            const rv = ratioValue(ratio)
-            const w = Math.min(cell.w, imgH * rv), h = w / rv
-            doc.addImage(c.toDataURL('image/jpeg', 0.8), 'JPEG', cell.x + (cell.w - w) / 2, cell.y + (imgH - h) / 2, w, h)
-          } catch { doc.setFontSize(9); doc.text('Picture not available', cell.x + 8, cell.y + 16) }
-        } else { doc.setFontSize(9); doc.setTextColor(140); doc.text('No frame', cell.x + 8, cell.y + 16); doc.setTextColor(0) }
-        doc.setFont('helvetica', 'bold'); doc.setFontSize(10); doc.text(shotLabel(sc, si, n), cell.x, cell.y + imgH + 13)
-        doc.setFont('helvetica', 'normal'); doc.setFontSize(9)
-        doc.text(doc.splitTextToSize([s.description, s.size].filter(Boolean).join(' · ') || ' ', cell.w - 34)[0] ?? '', cell.x + 34, cell.y + imgH + 13)
-      }
-      if (!all.length) doc.text('No shots yet.', 40, 60)
-      const blob = doc.output('blob')
-      const a = document.createElement('a'); a.href = URL.createObjectURL(blob); a.download = `${(b.project.name.replace(/[^\w-]+/g, '_') || 'storyboard')}-storyboard.pdf`; a.click()
-      setTimeout(() => URL.revokeObjectURL(a.href), 1000)
-    } catch (e) { setError(friendlyError(e)) } finally { setExporting(false) }
-  }
-
-  const head = (
-    <div className="lb-page-head">
-      <h1 className="lb-title">Storyboard</h1>
-      {st.locked ? <Permission level="locked" why="No access" /> : <Permission level={level === 'edit' ? 'edit' : 'view'} />}
-    </div>
-  )
-  if (st.locked) {
-    return (
-      <>
-        {head}
-        <EmptyState title="The storyboard is not open to your team" action={isOwnerOrAdmin(b) ? <Link className="lb-btn" to="../team">Open Team and access</Link> : undefined}>
-          The admin can change this in Team and access.
-        </EmptyState>
-      </>
-    )
-  }
-
-  const openShot = open ? shots.find((s) => s.id === open) : undefined
-  const openScene = openShot ? scenes.find((s) => s.id === openShot.scene_id) : undefined
-  const withShots = scenes.filter((sc) => (bySceneId.get(sc.id)?.length ?? 0) > 0)
-  const found = (sc: Scene) => matchScene(find.q, { number: sc.display_number ?? scenes.indexOf(sc) + 1, heading: sc.heading })
-  return (
-    <>
-      {head}
-      <p className="lb-caption lb-phone-hide">One frame for each shot. Add up to {MAX_LAYERS} photos, draw over them, and mark the frame done to flatten it into one picture. Frames belong to the shot's team.</p>
-      {!online && <Banner lead="Offline">Frames are blank without a connection. Download the storyboard as a PDF before you go somewhere with no signal.</Banner>}
-      {isOwnerOrAdmin(b) && (   /* storage usage is for the project owner and admins only; others just get a clear message if a picture is refused */
-      <div className="lb-row">
-        <span className="lb-caption"><b>{mb(used)} MB</b> of {capMb} MB used</span>
-        <span className="lb-meter" role="img" aria-label={`${Math.round(pct)} percent of the storyboard size limit used`}><span style={{ width: `${pct}%` }} /></span>
-        {pct >= 90 && <Badge kind="conflict"><Icon name="warn" /> Nearly full</Badge>}
-        {capEdit === null && <button className="lb-btn lb-btn--sm lb-btn--quiet" onClick={() => setCapEdit(String(capMb))}>Change limit</button>}
-        {capEdit !== null && (
-          <span className="lb-row">
-            <input className="lb-input" style={{ width: 110, minHeight: 36 }} type="number" min={10} max={5000} value={capEdit} aria-label="Size limit in MB" onChange={(e) => setCapEdit(e.target.value)} />
-            <button className="lb-btn lb-btn--sm" onClick={saveCap}>Save limit</button>
-            <button className="lb-btn lb-btn--sm lb-btn--quiet" onClick={() => setCapEdit(null)}>Cancel</button>
-          </span>
-        )}
-      </div>
-      )}
-      {error && <p className="lb-error" role="alert">{error}</p>}
-      {!shots.length && <EmptyState title="No shots yet" action={<Link className="lb-btn" to="../shots">Open the Shot list</Link>}>Frames belong to shots. Add shots in the shot list first.</EmptyState>}
-
-      <div className="lb-foldscope">
-      <FoldAll ids={scenes.filter((sc) => (bySceneId.get(sc.id)?.length ?? 0) > 0).map((sc) => sc.id)} fold={fold} />
-      <div className="lb-row" style={{ justifyContent: 'flex-end' }}>
-        <button type="button" className="lb-btn lb-btn--icon" aria-label={exporting ? 'Making the PDF' : 'Download storyboard PDF'} title="Download storyboard PDF" disabled={exporting || !shots.length} onClick={exportPdf}><Icon name="download" /></button></div>
-      <div className="lb-sheet lb-boards">
-        {scenes.map((sc, si) => {
-          const list = bySceneId.get(sc.id) ?? []
-          if (!list.length || !found(sc)) return null
-          return (
-            <section key={sc.id} className="lb-shotscene" aria-label={`Scene ${sc.display_number ?? si + 1}`}>
-              <header className="lb-shotscene-head">
-                <button className="lb-fold" aria-expanded={isOpen(sc.id)} onClick={() => fold.toggle(sc.id)}>
-                  <Icon name="chev" />
-                  <SceneChip n={sc.display_number} position={si + 1} omitted={sc.status === 'omitted'} />
-                  <h2 className="lb-sp-h">{sc.heading ? <Mark text={sc.heading} query={find.q} /> : <span className="lb-muted">No heading yet</span>}</h2>
-                  <span className="lb-caption lb-shotcount">{list.length} {list.length === 1 ? 'shot' : 'shots'}</span>
-                </button>
-              </header>
-              {isOpen(sc.id) && <div className="lb-grid">
-                {list.map((s, i) => {
-                  const f = frames.get(s.id)
-                  const editable = canEditShotsFor(b, s.team_id)
-                  return (
-                    <button key={s.id} className="lb-card-btn" onClick={() => setOpen(s.id)} aria-label={`Open the frame for shot ${shotLabel(sc, si, i + 1)}`}>
-                      <FrameThumb frame={f} urls={urls} offline={!online} ratio={ratio} />
-                      <span className="lb-card-cap">
-                        <span className="lb-body-strong">{shotLabel(sc, si, i + 1)}</span>
-                        <span className="lb-card-desc">{s.description || 'No description'}</span>
-                        <span className="lb-caption">
-                          {f?.done ? <><Icon name="check" /> Done</> : f ? 'Sketch' : editable ? 'Add a frame' : <span className="lb-rolock"><Icon name="lock" /><span className="lb-sr">No frame</span></span>}
-                        </span>
-                      </span>
-                    </button>
-                  )
-                })}
-              </div>}
-            </section>
-          )
-        })}
-        {find.q && !withShots.some(found) && <p className="lb-caption" role="status">No scenes match “{find.q}”.</p>}
-      </div>
-      </div>
-      {withShots.length > 0 && <SceneFind find={find} shown={withShots.filter(found).length} />}
-
-      {openShot && openScene && (
-        <FrameEditor
-          key={openShot.id + (frames.get(openShot.id)?.updated_at ?? '')}
-          shot={openShot} scene={openScene}
-          label={shotLabel(openScene, scenes.findIndex((s) => s.id === openScene.id), (bySceneId.get(openScene.id) ?? []).findIndex((s) => s.id === openShot.id) + 1)}
-          frame={frames.get(openShot.id)} canEdit={canEditShotsFor(b, openShot.team_id)} urls={urls}
-          usedByOthers={used - (frames.get(openShot.id)?.bytes ?? 0)} capBytes={capMb * 1048576} showUsage={isOwnerOrAdmin(b)} pid={pid} ratio={ratio}
-          onClose={() => setOpen(null)} onSaved={refresh}
-        />
-      )}
     </>
   )
 }

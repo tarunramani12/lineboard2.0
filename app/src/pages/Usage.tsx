@@ -3,6 +3,7 @@ import { useAuth } from '../lib/auth'
 import { friendlyError } from '../lib/errors'
 import { agoText, bytesText, supabaseRef, useIsAppAdmin, useOverview, useUsagePeople, useUsageProjects, type Overview } from '../lib/usage'
 import { AccountBar } from './Account'
+import { PageHeader } from '../components/PageHeader'
 
 /** Free plan file storage, from the hosting notes (100 GB on the Pro plan). Shown so the owner sees how close the app is. */
 const FREE_FILE_BYTES = 1073741824
@@ -73,11 +74,7 @@ export default function Usage() {
     <>
       <AccountBar back />
       <main className="lb-account lb-account--wide">
-        <div className="lb-page-head">
-          <h1 className="lb-title">Usage</h1>
-          <span className="lb-caption">{overview.data ? `Updated ${agoText(overview.data.generated_at)}, refreshes every minute` : ''}</span>
-        </div>
-        <p className="lb-caption">Only people on the app admin list see this page. It shows counts and sizes, never project content.</p>
+        <PageHeader title="Usage" info={overview.data ? <span>Updated {agoText(overview.data.generated_at)}</span> : undefined} />
         {overview.isError && <p className="lb-error" role="alert">{friendlyError(overview.error)}</p>}
         {overview.isLoading && <p className="lb-caption">Loading the totals</p>}
         {overview.data && <Totals o={overview.data} />}

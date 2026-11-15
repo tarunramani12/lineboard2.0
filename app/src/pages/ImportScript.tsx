@@ -2,7 +2,7 @@ import { useMemo, useState } from 'react'
 import { Link, useNavigate, useOutletContext } from 'react-router-dom'
 import { useQueryClient } from '@tanstack/react-query'
 import type { Ctx } from '../components/ProjectLayout'
-import { Badge, Banner, EmptyState, Icon, Permission } from '../components/ui'
+import { Badge, Banner, EmptyState, Icon } from '../components/ui'
 import { ELEMENT_LABELS, LINES_PER_PAGE, estimateLines } from '../lib/fountain'
 import { friendlyError } from '../lib/errors'
 import { readDocx, readPdf } from '../lib/importDocs'
@@ -17,6 +17,7 @@ import {
 import { isOwner, useScenes } from '../lib/project'
 import { useSceneLocks, useSceneTexts } from '../lib/script'
 import { supabase } from '../lib/supabase'
+import { PageHeader } from '../components/PageHeader'
 
 const FORMAT_NAME = { fdx: 'Final Draft (.fdx)', fountain: 'Fountain', text: 'Plain text', pdf: 'a PDF', docx: 'a Word file' } as const
 type How = MatchHow | 'manual'
@@ -135,12 +136,7 @@ export default function ImportScript() {
     nav(`/p/${pid}/script`, { replace: true, state })
   }
 
-  const head = (
-    <div className="lb-page-head">
-      <h1 className="lb-title">{hasExisting ? 'Import a script or a new draft' : 'Import a script'}</h1>
-      <Permission level={owner ? 'edit' : 'locked'} why="Admin only" />
-    </div>
-  )
+  const head = <PageHeader title={hasExisting ? 'Import a script or a new draft' : 'Import a script'} />
 
   if (!owner) {
     return (

@@ -19,7 +19,6 @@ const paths: Record<string, ReactNode> = {
   s_script: <><path d="M7 3h8l4 4v14H7z" /><path d="M10 12h6M10 16h6" /></>,
   s_scenes: <><rect x="3" y="7" width="18" height="13" rx="2" /><path d="M3 11h18M7 7l-2-4M13 7l-2-4M19 7l-2-4" /></>,
   s_shots: <><rect x="3" y="7" width="13" height="11" rx="2" /><path d="M16 11l5-3v8l-5-3" /></>,
-  s_storyboard: <><rect x="3" y="4" width="8" height="7" rx="1.5" /><rect x="13" y="4" width="8" height="7" rx="1.5" /><rect x="3" y="13" width="8" height="7" rx="1.5" /><path d="M13 16.5h8" /></>,
   s_bible: <><path d="M6 4h11a2 2 0 0 1 2 2v14H8a2 2 0 0 1-2-2z" /><path d="M6 18a2 2 0 0 1 2-2h11M10 8h5" /></>,
   s_breakdown: <><path d="M4 7h3M4 12h3M4 17h3M10 7h10M10 12h10M10 17h10" /></>,
   s_cast: <><circle cx="9" cy="8" r="3" /><path d="M3 20a6 6 0 0 1 12 0" /><circle cx="17" cy="9" r="2.5" /><path d="M17 14.5a5 5 0 0 1 4 5.5" /></>,
@@ -272,7 +271,12 @@ export function Banner({ kind, lead, children, action }: { kind?: 'alert' | 'qui
   )
 }
 
-export function Dialog({ title, children, onClose, sheet, badge, wide }: { title: string; children: ReactNode; onClose: () => void; sheet?: boolean; badge?: ReactNode; wide?: boolean }) {
+/**
+ * The one dialog every page uses: drawn under the page body (no parent can clip it), closes on Escape or a click outside,
+ * wide for forms, a bottom sheet on a phone. `bare` leaves out the plain title heading for pages that draw their own header
+ * (a title with badges and buttons beside it); `title` is then only the accessible name.
+ */
+export function Dialog({ title, children, onClose, sheet, badge, wide, bare }: { title: string; children: ReactNode; onClose: () => void; sheet?: boolean; badge?: ReactNode; wide?: boolean; bare?: boolean }) {
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => { if (e.key === 'Escape') onClose() }
     document.addEventListener('keydown', onKey)
@@ -283,7 +287,7 @@ export function Dialog({ title, children, onClose, sheet, badge, wide }: { title
     <div className={'lb-scrim' + (sheet ? ' lb-scrim--sheet' : '')} onMouseDown={(e) => { if (e.target === e.currentTarget) onClose() }}>
       <div className={'lb-dialog' + (wide ? ' lb-dialog--wide' : '')} role="dialog" aria-modal="true" aria-label={title}>
         {badge}
-        <h2>{title}</h2>
+        {!bare && <h2>{title}</h2>}
         {children}
       </div>
     </div>, document.body)
@@ -317,7 +321,8 @@ export function useOnline() {
  * The hamburger menu (three lines) used on phones: one icon button that opens a layer on top of the page listing the page's actions.
  * Items marked hidden are left out. Choosing one closes the layer first, then runs it.
  */
-export function PageMenu({ items, label = 'Page actions' }: { items: { label: string; icon?: keyof typeof paths; onClick: () => void; to?: string; hidden?: boolean; disabled?: boolean }[]; label?: string }) {
+export interface MenuItem { label: string; icon?: keyof typeof paths; onClick: () => void; to?: string; hidden?: boolean; disabled?: boolean }
+export function PageMenu({ items, label = 'Page actions' }: { items: MenuItem[]; label?: string }) {
   const [open, setOpen] = useState(false)
   const shown = items.filter((i) => !i.hidden)
   if (!shown.length) return null

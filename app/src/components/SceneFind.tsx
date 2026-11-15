@@ -1,6 +1,5 @@
-import { useEffect, useRef, useState, type CSSProperties } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { Icon } from './ui'
-import { useTopbarHeight } from '../lib/useTopbarHeight'
 import { highlight } from '../lib/sceneSearch'
 
 /**
@@ -22,26 +21,24 @@ export function Mark({ text, query }: { text: string; query: string }) {
 }
 
 /**
- * A search button. Pressing it opens the search field; the cross clears the search and puts the button back.
- * `shown` is how many scenes match. By default it floats at the bottom right of the screen. With `inline` it takes its place
- * in a bar (the Script page): the button becomes the field in the same spot and fills the space up to the end of the bar.
+ * A search button for the quick bar of a PageHeader. Pressing it opens the search field in the same spot, filling the space up to the end of the bar;
+ * the cross clears the search and puts the button back. `shown` is how many scenes match.
  */
-export function SceneFind({ find, shown, inline }: { find: SceneFindState; shown: number; inline?: boolean }) {
+export function SceneFind({ find, shown }: { find: SceneFindState; shown: number }) {
   const input = useRef<HTMLInputElement>(null)
-  const top = useTopbarHeight()
   useEffect(() => { if (find.open) input.current?.focus() }, [find.open])
 
-  const cls = inline ? 'lb-find-inline' : 'lb-find'
+  const cls = 'lb-find-inline'
   if (!find.open) {
     return (
       <div className={cls}>
-        <button type="button" className={inline ? 'lb-btn lb-btn--icon' : 'lb-zoom-pill lb-find-btn'} aria-label="Search scenes" title="Search scenes" onClick={() => find.setOpen(true)}><Icon name="search" /></button>
+        <button type="button" className="lb-btn lb-btn--icon" aria-label="Search scenes" title="Search scenes" onClick={() => find.setOpen(true)}><Icon name="search" /></button>
       </div>
     )
   }
   const word = find.q ? (shown === 1 ? '1 scene matches' : `${shown} scenes match`) : 'Scene number or words'
   return (
-    <div className={cls + ' is-open'} style={{ '--find-top': `${top + 8}px` } as CSSProperties}>
+    <div className={cls + ' is-open'}>
       <form className="lb-find-bar" role="search" onSubmit={(e) => e.preventDefault()}>
         <Icon name="search" />
         <input ref={input} className="lb-find-input" type="search" inputMode="search" enterKeyHint="search" autoComplete="off" spellCheck={false}

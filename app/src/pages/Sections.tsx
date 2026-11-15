@@ -3,7 +3,7 @@ import { Link, useNavigate, useOutletContext, useParams } from 'react-router-dom
 import { useQueryClient } from '@tanstack/react-query'
 import type { Ctx } from '../components/ProjectLayout'
 import { navState } from '../components/ProjectLayout'
-import { Badge, Dialog, EmptyState, Field, Icon, Permission, rowOpen, useAction } from '../components/ui'
+import { Badge, Dialog, EmptyState, Field, Icon, rowOpen, useAction } from '../components/ui'
 import { friendlyError } from '../lib/errors'
 import { useAuth } from '../lib/auth'
 import { KIND_LABEL, MAIL_DOMAIN, senderPreview, STATUS_LABEL, useOutbox } from '../lib/email'
@@ -15,6 +15,7 @@ import { RequestAccessCard } from '../components/AccessRequests'
 import { removeMoodFolder } from '../lib/bible'
 import { removeLocationFolder } from '../lib/locations'
 import { supabase } from '../lib/supabase'
+import { PageHeader } from '../components/PageHeader'
 
 /** A section that exists in the navigation but is built in a later step. */
 export function SectionPage() {
@@ -24,13 +25,9 @@ export function SectionPage() {
   if (!def) return <EmptyState title="Page not found" action={<Link className="lb-btn" to="..">Back to overview</Link>} />
   const owner = b.people.find((p) => p.role === 'owner')
   const st = navState(b, def)
-  const level = def.key ? levelFor(b, def.key) : 'edit'
   return (
     <>
-      <div className="lb-page-head">
-        <h1 className="lb-title">{def.label}</h1>
-        {st.locked ? <Permission level="locked" why="No access" /> : <Permission level={level === 'edit' ? 'edit' : 'view'} />}
-      </div>
+      <PageHeader title={def.label} />
       {st.locked ? (
         <EmptyState title={`${def.label} is not open to your team`}
           action={isOwnerOrAdmin(b) ? <Link className="lb-btn" to="../team">Open Team and access</Link> : undefined}>
@@ -101,7 +98,7 @@ export function ExportSettings() {
 
   return (
     <>
-      <div className="lb-page-head"><h1 className="lb-title">Export and settings</h1></div>
+      <PageHeader title="Export and settings" />
       <section className="lb-card lb-stack">
         <h2 className="lb-heading">Export</h2>
         {isOwnerOrAdmin(b) ? (
@@ -121,7 +118,7 @@ export function ExportSettings() {
         <h2 className="lb-heading">PDFs for each department</h2>
         <p className="lb-caption lb-phone-hide">Each department downloads its own file from its own page, with the paper size you choose. You only see the pages you have access to. A lock means your team cannot open that page.</p>
         <ul className="lb-unlist">
-          {([['script', 'Script (screenplay layout, scene numbers)', 'script', 'script'], ['shots', 'Shot list', 'shots', 'shots'], ['storyboard', 'Storyboard pictures', 'storyboard', 'shots'], ['bible', 'Project bible', 'bible', 'bible'], ['breakdown', 'Breakdown', 'breakdown', 'breakdown'], ['cast', 'Cast and crew', 'cast', 'cast_crew'], ['locations', 'Locations', 'locations', 'locations'], ['props', 'Props, one per schedule', 'props', 'props'], ['equipment', 'Equipment, one per schedule', 'equipment', 'equipment'], ['schedule', 'Schedule', 'schedule', 'schedule'], ['callsheets', 'Call sheets, one per shoot day', 'callsheets', 'call_sheets']] as const).map(([path, label, , key]) => {
+          {([['script', 'Script (screenplay layout, scene numbers)', 'script', 'script'], ['shots', 'Shots (shot list and storyboard)', 'shots', 'shots'], ['bible', 'Project bible', 'bible', 'bible'], ['breakdown', 'Breakdown', 'breakdown', 'breakdown'], ['cast', 'Cast and crew', 'cast', 'cast_crew'], ['locations', 'Locations', 'locations', 'locations'], ['props', 'Props, one per schedule', 'props', 'props'], ['equipment', 'Equipment, one per schedule', 'equipment', 'equipment'], ['schedule', 'Schedule', 'schedule', 'schedule'], ['callsheets', 'Call sheets, one per shoot day', 'callsheets', 'call_sheets']] as const).map(([path, label, , key]) => {
             const open = levelFor(b, key) !== 'none'
             return (
               <li key={path} className={open ? 'is-click' : undefined} style={{ justifyContent: 'space-between', minHeight: 44 }} {...(open ? rowOpen(() => nav(`/p/${pid}/${path}`)) : {})}>

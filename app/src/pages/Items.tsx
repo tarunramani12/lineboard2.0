@@ -1,8 +1,8 @@
-import { useEffect, useMemo, useState } from 'react'
+import { useMemo, useState } from 'react'
 import { Link, useOutletContext } from 'react-router-dom'
 import { useQueryClient } from '@tanstack/react-query'
 import { navState, type Ctx } from '../components/ProjectLayout'
-import { Badge, Choice, EmptyState, Icon, Permission, SwipeRow, rowOpen } from '../components/ui'
+import { Badge, Choice, EmptyState, Icon, SwipeRow, rowOpen, Dialog } from '../components/ui'
 import { useBreakdown } from '../lib/breakdown'
 import { friendlyError } from '../lib/errors'
 import {
@@ -13,7 +13,8 @@ import { isOwnerOrAdmin, levelFor, useScenes } from '../lib/project'
 import { formatRange, scenesOnAnyDay, useScheduleData } from '../lib/schedule'
 import { useShots } from '../lib/shots'
 import { SECTIONS } from '../lib/sections'
-import { ReportButton } from '../components/ReportButton'
+import { useReportDownload } from '../components/ReportButton'
+import { PageHeader } from '../components/PageHeader'
 import { buildReportPdf, fileSafe } from '../lib/reportPdf'
 import { itemsReport } from '../lib/reports'
 import { supabase } from '../lib/supabase'
@@ -51,11 +52,6 @@ function ItemDialog({ kind, pid, scheduleId, item, cost, links, sceneOptions, ca
   const [confirm, setConfirm] = useState(false)
   const dis = !editable || busy
 
-  useEffect(() => {
-    const h = (e: KeyboardEvent) => { if (e.key === 'Escape') onClose() }
-    document.addEventListener('keydown', h)
-    return () => document.removeEventListener('keydown', h)
-  }, [onClose])
 
   async function save() {
     const q = Number(qty)
@@ -108,8 +104,7 @@ function ItemDialog({ kind, pid, scheduleId, item, cost, links, sceneOptions, ca
   const canPick = !dis && (item ? isOwnerOrAdmin(b) : mine.length > 1)
 
   return (
-    <div className="lb-scrim" onMouseDown={(e) => { if (e.target === e.currentTarget) onClose() }}>
-      <div className="lb-dialog lb-dialog--wide" role="dialog" aria-modal="true" aria-label={item ? `Edit ${info.one}` : `New ${info.one}`}>
+    <Dialog bare wide title={item ? `Edit ${info.one}` : `New ${info.one}`} onClose={onClose}>
         <h2 className="lb-heading" style={{ margin: 0 }}>{item ? item.name : `Add ${info.one === 'prop' ? 'a prop' : 'an item'}`}</h2>
         <div className="lb-shotgrid">
           {field('it-name', 'Name', <input id="it-name" className="lb-input" autoFocus={!item} value={name} maxLength={120} disabled={dis} onChange={(e) => setName(e.target.value)} />)}
@@ -160,8 +155,7 @@ function ItemDialog({ kind, pid, scheduleId, item, cost, links, sceneOptions, ca
           <span className="lb-row">{item && editable && <button className="lb-btn lb-btn--danger" disabled={busy} onClick={() => (confirm ? void remove() : setConfirm(true))}>{confirm ? `Really delete this ${info.one}` : 'Delete'}</button>}</span>
           <span className="lb-row"><button className="lb-btn" onClick={onClose}>Close</button>{editable && <button className="lb-btn lb-btn--primary" disabled={busy} onClick={save}>{busy ? 'Saving' : item ? 'Save' : 'Add'}</button>}</span>
         </div>
-      </div>
-    </div>
+      </Dialog>
   )
 }
 
@@ -171,7 +165,6 @@ export default function ItemsPage({ kind }: { kind: ItemKind }) {
   const qc = useQueryClient()
   const def = SECTIONS.find((s) => s.path === info.path)!
   const st = navState(b, def)
-  const level = levelFor(b, info.section)
   const seeCost = canSeeCosts(b)
   const mine = teamsIEditItems(b, kind)
   const sched = useScheduleData(pid)
@@ -212,16 +205,12 @@ export default function ItemsPage({ kind }: { kind: ItemKind }) {
   const defaultTeam = (own ?? mine.find((t) => t.role_tag === (kind === 'prop' ? 'art' : 'camera')) ?? mine[0])?.id ?? ''
   const teamName = (id: string) => b.teams.find((t) => t.id === id)?.name ?? 'No team'
 
-  const head = (
-    <div className="lb-page-head">
-      <h1 className="lb-title">{info.title}</h1>
-      {st.locked ? <Permission level="locked" why="No access" /> : <Permission level={level === 'edit' ? 'edit' : 'view'} />}
-    </div>
-  )
+  const pdf = useReportDownload(current ? `${fileSafe(b.project.name)}-${info.path}-${fileSafe(current.name)}` : 'list',
+    (size) => current ? buildReportPdf(itemsReport({ project: b.project.name, size, kind, schedule: current, items, costs: seeCost ? costs : null, teams: b.teams, links, scenes: scenesQ.data ?? [] })) : Promise.reject(new Error('No schedule yet.')))
   if (st.locked) {
     return (
       <>
-        {head}
+        <PageHeader title={info.title} />
         <EmptyState title={`${info.title} is not open to your team`} action={isOwnerOrAdmin(b) ? <Link className="lb-btn" to="../team">Open Team and access</Link> : undefined}>The admin can change this in Team and access.</EmptyState>
       </>
     )
@@ -265,28 +254,24 @@ export default function ItemsPage({ kind }: { kind: ItemKind }) {
 
   return (
     <>
-      {head}
-      <p className="lb-caption lb-phone-hide">{kind === 'equipment'
-        ? 'One equipment list for each schedule. Each team lists its own equipment and sees only its own. The head of department edits it. Cost is visible only to the admins and the Production team.'
-        : 'One prop list for each schedule. Each team adds its own and only that team edits it. Cost is visible only to the admins and the Production team.'}</p>
+      <PageHeader title={info.title}
+        info={current ? <><span>{current.name}, {formatRange(current.start_date, current.end_date)}</span><span><b>{items.length}</b> {items.length === 1 ? 'item' : 'items'}</span></> : undefined}
+        menu={st.locked || !current ? undefined : [
+          { label: `Add ${info.one === 'prop' ? 'prop' : 'item'}`, icon: 'plus', hidden: mine.length === 0, onClick: () => setOpen({ id: null }) },
+          { label: `Download ${info.title.toLowerCase()} PDF`, icon: 'download', hidden: items.length === 0, onClick: () => void pdf.go() },
+        ]}
+        quick={current && schedules.length > 1 ? (
+          <select className="lb-input" style={{ width: 'auto', maxWidth: '100%' }} aria-label="Schedule" value={current.id} onChange={(e) => choose(e.target.value)}>
+            {schedules.map((sc) => <option key={sc.id} value={sc.id}>{sc.name}</option>)}
+          </select>
+        ) : undefined} />
+      {pdf.error && <p className="lb-error" role="alert">{pdf.error}</p>}
       {error && <p className="lb-error" role="alert">{error}</p>}
       {note && <p className="lb-caption" role="status">{note}</p>}
       {sched.isLoading || itemsQ.isLoading ? <p className="lb-caption" role="status">Loading</p> : !current ? (
-        <EmptyState title="No schedule yet" action={<Link className="lb-btn lb-btn--primary" to="../schedule">Open Schedule</Link>}>{info.title} lists belong to a schedule. Create a schedule first, then come back here.</EmptyState>
+        <EmptyState title="No schedule yet" action={<Link className="lb-btn lb-btn--primary" to="../schedule">Open the Schedule</Link>}>{info.title} lists belong to a schedule. Create a schedule first, then come back here.</EmptyState>
       ) : (
         <>
-          <div className="lb-row">
-            {schedules.length > 1 && (
-              <select className="lb-input" style={{ width: 'auto', maxWidth: '100%' }} aria-label="Schedule" value={current.id} onChange={(e) => choose(e.target.value)}>
-                {schedules.map((s) => <option key={s.id} value={s.id}>{s.name}</option>)}
-              </select>
-            )}
-            <span className="lb-caption">{current.name}, {formatRange(current.start_date, current.end_date)}</span>
-            <span style={{ flex: 1 }} />
-            <ReportButton label={`Download ${info.title.toLowerCase()} PDF`} file={`${fileSafe(b.project.name)}-${info.path}-${fileSafe(current.name)}`} disabled={items.length === 0}
-              build={(size) => buildReportPdf(itemsReport({ project: b.project.name, size, kind, schedule: current, items, costs: seeCost ? costs : null, teams: b.teams, links, scenes: scenesQ.data ?? [] }))} />
-            {mine.length > 0 && <button className="lb-btn lb-btn--primary" onClick={() => setOpen({ id: null })}><Icon name="plus" /> Add {info.one === 'prop' ? 'prop' : 'item'}</button>}
-          </div>
 
           {mine.length > 0 && others.length > 0 && (
             <div className="lb-row">

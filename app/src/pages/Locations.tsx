@@ -2,12 +2,13 @@ import { lazy, Suspense, useMemo, useState } from 'react'
 import { Link, useOutletContext } from 'react-router-dom'
 import { useQueryClient } from '@tanstack/react-query'
 import { navState, useMedia, type Ctx } from '../components/ProjectLayout'
-import { Badge, Choice, EmptyState, Icon, PageMenu, Permission, SwipeRow, rowOpen } from '../components/ui'
+import { Badge, Choice, EmptyState, Icon, SwipeRow, rowOpen, Dialog } from '../components/ui'
 import { AvailabilityTab, CostsTab, PhotosTab, ScenesTab } from '../components/LocationTabs'
 import { friendlyError } from '../lib/errors'
 import { isOwnerOrAdmin, levelFor, useScenes } from '../lib/project'
 import { canSeeCosts } from '../lib/items'
-import { ReportButton, useReportDownload } from '../components/ReportButton'
+import { useReportDownload } from '../components/ReportButton'
+import { PageHeader } from '../components/PageHeader'
 import { buildReportPdf, fileSafe } from '../lib/reportPdf'
 import { locationsReport } from '../lib/reports'
 import { SECTIONS } from '../lib/sections'
@@ -154,8 +155,7 @@ function LocationDialog({ loc, data, canEdit, seeContacts, seeCosts, onClose, on
   const tabProps = current ? { loc: current, data, canEdit, pid, refresh } : null
 
   return (
-    <div className="lb-scrim" onMouseDown={(e) => { if (e.target === e.currentTarget) onClose() }}>
-      <div className="lb-dialog lb-dialog--wide" role="dialog" aria-modal="true" aria-label={loc ? 'Location' : 'New location'}>
+    <Dialog bare wide title={loc ? 'Location' : 'New location'} onClose={onClose}>
         <div className="lb-spread">
           <h2 className="lb-heading" style={{ margin: 0 }}>{loc ? (current?.name || 'Location') : 'Add a location'}</h2>
           <span className="lb-row">{locked && <Badge kind="locked">Locked</Badge>}</span>
@@ -264,8 +264,7 @@ function LocationDialog({ loc, data, canEdit, seeContacts, seeCosts, onClose, on
             {canEdit && tab === 'details' && <button className="lb-btn lb-btn--primary" disabled={busy || !dirty} onClick={() => void save()}>{busy ? 'Saving' : loc ? 'Save' : 'Add'}</button>}
           </span>
         </div>
-      </div>
-    </div>
+      </Dialog>
   )
 }
 
@@ -289,17 +288,10 @@ export default function Locations() {
   const makePdf = (size: 'a4' | 'letter') => buildReportPdf(locationsReport({ project: b.project.name, size, data: data!, scenes: scenesQ.data ?? [], withContacts: seeContacts, withCosts: seeCosts }))
   const pdf = useReportDownload(fileSafe(b.project.name) + '-locations', makePdf)
 
-  const head = (
-    <div className="lb-page-head">
-      <h1 className="lb-title">Locations</h1>
-      {st.locked ? <Permission level="locked" why="No access" /> : <Permission level={canEdit ? 'edit' : 'view'} />}
-      {phone && !st.locked && <PageMenu label="Locations actions" items={[{ label: 'Add location', icon: 'plus', hidden: !canEdit, onClick: () => setOpen({ id: null }) }, { label: 'Download locations PDF', icon: 'download', hidden: !data || data.locs.length === 0, onClick: () => void pdf.go() }]} />}
-    </div>
-  )
   if (st.locked) {
     return (
       <>
-        {head}
+        <PageHeader title="Locations" />
         <EmptyState title="Locations is not open to your team" action={isOwnerOrAdmin(b) ? <Link className="lb-btn" to="../team">Open Team and access</Link> : undefined}>The admin can change this in Team and access.</EmptyState>
       </>
     )
@@ -313,21 +305,22 @@ export default function Locations() {
 
   return (
     <>
-      {head}
-      <p className="lb-caption lb-phone-hide">Find, compare and lock film locations. Each location holds its address, a map pin, photos you can draw on, linked scenes, dates it is free, and, for Admins and Production, its costs.</p>
-      <div className="lb-row">
-        <div className="lb-seg lb-seg--scroll" role="group" aria-label="Status">
-          <button type="button" aria-pressed={show === 'all'} onClick={() => setShow('all')}>All {locs.length}</button>
-          {STATUSES.map((s) => <button key={s} type="button" aria-pressed={show === s} onClick={() => setShow(s)}>{STATUS_LABEL[s]} {counts(s)}</button>)}
-        </div>
-        <span className="lb-grow" style={{ flex: 1 }} />
-        <div className="lb-seg" role="group" aria-label="View">
-          <button type="button" aria-pressed={view === 'list'} onClick={() => setView('list')}>List</button>
-          <button type="button" aria-pressed={view === 'map'} onClick={() => setView('map')}>Map</button>
-        </div>
-        {!phone && data && data.locs.length > 0 && <ReportButton label="Download locations PDF" file={fileSafe(b.project.name) + '-locations'} build={makePdf} />}
-        {!phone && canEdit && <button className="lb-btn lb-btn--primary" onClick={() => setOpen({ id: null })}><Icon name="plus" /> Add location</button>}
-      </div>
+      <PageHeader title="Locations"
+        info={<><span><b>{locs.length}</b> {locs.length === 1 ? 'location' : 'locations'}</span><span><b>{counts('locked')}</b> locked</span></>}
+        menu={st.locked ? undefined : [
+          { label: 'Add location', icon: 'plus', hidden: !canEdit, onClick: () => setOpen({ id: null }) },
+          { label: 'Download locations PDF', icon: 'download', hidden: !(data && data.locs.length > 0), onClick: () => void pdf.go() },
+        ]}
+        quick={<>
+          <div className="lb-seg lb-seg--scroll" role="group" aria-label="Status">
+            <button type="button" aria-pressed={show === 'all'} onClick={() => setShow('all')}>All {locs.length}</button>
+            {STATUSES.map((s) => <button key={s} type="button" aria-pressed={show === s} onClick={() => setShow(s)}>{STATUS_LABEL[s]} {counts(s)}</button>)}
+          </div>
+          <div className="lb-seg" role="group" aria-label="View">
+            <button type="button" aria-pressed={view === 'list'} onClick={() => setView('list')}>List</button>
+            <button type="button" aria-pressed={view === 'map'} onClick={() => setView('map')}>Map</button>
+          </div>
+        </>} />
       {pdf.error && <p className="lb-error" role="alert">{pdf.error}</p>}
       {q.isError && <p className="lb-error" role="alert">The locations could not load. Check your connection.</p>}
       {view === 'map' && (

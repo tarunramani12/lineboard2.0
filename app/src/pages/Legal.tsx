@@ -14,7 +14,7 @@ function Page({ title, children }: { title: string; children: ReactNode }) {
         <Link to="/signin" aria-label="LineBoard home"><Wordmark large /></Link>
       </div>
       <div className="lb-card lb-stack" style={{ padding: 24 }}>
-        <h1 className="lb-heading">{title}</h1>
+        <h1 className="lb-title">{title}</h1>
         <p className="lb-caption">Last updated {UPDATED}</p>
         {children}
       </div>

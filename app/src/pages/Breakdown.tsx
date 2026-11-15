@@ -2,14 +2,15 @@ import { useEffect, useMemo, useState } from 'react'
 import { Link, useOutletContext } from 'react-router-dom'
 import { useQueryClient } from '@tanstack/react-query'
 import { navState, type Ctx } from '../components/ProjectLayout'
-import { Badge, Choice, EmptyState, Icon, Permission, SceneChip, rowOpen } from '../components/ui'
+import { Badge, Choice, EmptyState, Icon, SceneChip, rowOpen, Dialog } from '../components/ui'
 import {
   CATEGORIES, canEditBreakdownFor, countByCategory, detectCast, teamsIEditBreakdown, usedNames, useBreakdown,
   type BItem, type BScene, type Category,
 } from '../lib/breakdown'
 import { friendlyError } from '../lib/errors'
-import { isOwnerOrAdmin, levelFor, useScenes } from '../lib/project'
-import { ReportButton } from '../components/ReportButton'
+import { isOwnerOrAdmin, useScenes } from '../lib/project'
+import { useReportDownload } from '../components/ReportButton'
+import { PageHeader } from '../components/PageHeader'
 import { buildReportPdf, fileSafe } from '../lib/reportPdf'
 import { breakdownReport } from '../lib/reports'
 import { canReadScene, revisionLabel, useMyScriptAccess, useSceneTexts } from '../lib/script'
@@ -100,11 +101,6 @@ function SceneDialog({ scene, sceneIndex, items, allItems, form, castSuggestions
   const nameOf = (uid: string | null) => b.people.find((p) => p.account_id === uid)?.name ?? 'Someone'
   const set = (k: keyof typeof draft, v: string) => { setSavedNote(false); setDraft((d) => ({ ...d, [k]: v })) }
 
-  useEffect(() => {
-    const h = (e: KeyboardEvent) => { if (e.key === 'Escape') onClose() }
-    document.addEventListener('keydown', h)
-    return () => document.removeEventListener('keydown', h)
-  }, [onClose])
 
   async function saveForm() {
     setBusy(true); setError(null)
@@ -150,8 +146,7 @@ function SceneDialog({ scene, sceneIndex, items, allItems, form, castSuggestions
 
   const field = (id: string, text: string, node: React.ReactNode) => <div className="lb-field"><label htmlFor={id}>{text}</label>{node}</div>
   return (
-    <div className="lb-scrim" onMouseDown={(e) => { if (e.target === e.currentTarget) onClose() }}>
-      <div className="lb-dialog lb-dialog--wide" role="dialog" aria-modal="true" aria-label={`Breakdown for scene ${scene.display_number ?? sceneIndex + 1}`}>
+    <Dialog bare wide title={`Breakdown for scene ${scene.display_number ?? sceneIndex + 1}`} onClose={onClose}>
         <div className="lb-spread">
           <h2 className="lb-heading" style={{ margin: 0 }}>Breakdown: scene {scene.display_number ?? sceneIndex + 1}</h2>
           {scene.revised_in ? <Badge kind="conflict"><Icon name="warn" /> Scene revised ({revisionLabel(scene.revised_in)})</Badge> : null}
@@ -223,8 +218,7 @@ function SceneDialog({ scene, sceneIndex, items, allItems, form, castSuggestions
         })}
         {error && <p className="lb-error" role="alert">{error}</p>}
         <div className="lb-actions"><button className="lb-btn lb-btn--primary" onClick={onClose}>Done</button></div>
-      </div>
-    </div>
+      </Dialog>
   )
 }
 
@@ -242,7 +236,6 @@ export default function Breakdown() {
   const texts = useSceneTexts(pid, scenes.map((s) => s.id))
   const def = SECTIONS.find((s) => s.path === 'breakdown')!
   const st = navState(b, def)
-  const level = levelFor(b, 'breakdown')
   const [open, setOpen] = useState<string | null>(null)
   const [teamFilter, setTeamFilter] = useState('')
   const [showOmitted, setShowOmitted] = useState(false)
@@ -254,16 +247,11 @@ export default function Breakdown() {
     return m
   }, [items])
 
-  const head = (
-    <div className="lb-page-head">
-      <h1 className="lb-title">Breakdown</h1>
-      {st.locked ? <Permission level="locked" why="No access" /> : <Permission level={level === 'edit' ? 'edit' : 'view'} />}
-    </div>
-  )
+  const pdf = useReportDownload(fileSafe(b.project.name) + '-breakdown', (size) => buildReportPdf(breakdownReport({ project: b.project.name, size, scenes, items: q.data?.items ?? [], forms: q.data?.forms ?? new Map(), teams: b.teams })))
   if (st.locked) {
     return (
       <>
-        {head}
+        <PageHeader title="Breakdown" />
         <EmptyState title="The breakdown is not open to your team" action={isOwnerOrAdmin(b) ? <Link className="lb-btn" to="../team">Open Team and access</Link> : undefined}>
           The admin can change this in Team and access.
         </EmptyState>
@@ -280,14 +268,11 @@ export default function Breakdown() {
 
   return (
     <>
-      {head}
-      <div className="lb-row" style={{ justifyContent: 'flex-end' }}>
-        <ReportButton label="Download breakdown PDF" file={fileSafe(b.project.name) + '-breakdown'} disabled={scenes.length === 0}
-          build={(size) => buildReportPdf(breakdownReport({ project: b.project.name, size, scenes, items: q.data?.items ?? [], forms: q.data?.forms ?? new Map(), teams: b.teams }))} />
-      </div>
-      <p className="lb-caption lb-phone-hide">One form for each scene: where and when it happens, and everything it needs, by department. Each element belongs to the team that added it, and only that team edits it. Quantities of equipment at 0 are listed but not counted.</p>
-      {scenes.length > 0 && (
-        <div className="lb-row">
+      <PageHeader title="Breakdown"
+        info={<><span><b>{scenes.length}</b> {scenes.length === 1 ? 'scene' : 'scenes'}</span>{teamFilter && <span>{shown.length} for <b>{teamName(teamFilter)}</b></span>}</>}
+        menu={st.locked ? undefined : [{ label: 'Download breakdown PDF', icon: 'download', hidden: scenes.length === 0, onClick: () => void pdf.go() }]}
+        quick={scenes.length > 0 ? (
+          <>
           <label className="lb-row" htmlFor="bd-filter">Show scenes tagged by
             <select id="bd-filter" className="lb-input" style={{ width: 'auto' }} value={teamFilter} onChange={(e) => setTeamFilter(e.target.value)}>
               <option value="">All teams</option>
@@ -295,9 +280,9 @@ export default function Breakdown() {
             </select>
           </label>
           {omittedCount > 0 && <label className="lb-radio"><input type="checkbox" checked={showOmitted} onChange={(e) => setShowOmitted(e.target.checked)} /><span>Show {omittedCount} omitted</span></label>}
-          {teamFilter && <span className="lb-caption">{shown.length} {shown.length === 1 ? 'scene' : 'scenes'} for {teamName(teamFilter)}</span>}
-        </div>
-      )}
+          </>
+        ) : undefined} />
+      {pdf.error && <p className="lb-error" role="alert">{pdf.error}</p>}
       {!scenes.length && <EmptyState title="No scenes yet" action={<Link className="lb-btn" to="../script">Open the Script</Link>}>The breakdown fills from the scenes of the script. Write or import the script first.</EmptyState>}
       {scenes.length > 0 && (
         <div className="lb-sheet">

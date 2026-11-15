@@ -1,17 +1,18 @@
-import { useEffect, useMemo, useState } from 'react'
+import { useMemo, useState } from 'react'
 import { Link, useOutletContext } from 'react-router-dom'
 import { useQueryClient } from '@tanstack/react-query'
 import { navState, type Ctx } from '../components/ProjectLayout'
-import { Badge, Choice, EmptyState, Icon, PageMenu, Permission, SwipeRow, rowOpen } from '../components/ui'
-import { useMedia } from '../components/ProjectLayout'
+import { Badge, Choice, EmptyState, Icon, SwipeRow, rowOpen, Dialog } from '../components/ui'
+
 import {
   CREW_ROLES, canEditCrewFor, departmentOptions, canSeeContacts, displayName, isFormer, teamsICanEditCrew, useCastCrew,
   type CrewContact, type CrewKind, type CrewRow,
 } from '../lib/castcrew'
 import { friendlyError } from '../lib/errors'
-import { isOwnerOrAdmin, levelFor } from '../lib/project'
+import { isOwnerOrAdmin } from '../lib/project'
 import { SECTIONS } from '../lib/sections'
-import { ReportButton, useReportDownload } from '../components/ReportButton'
+import { useReportDownload } from '../components/ReportButton'
+import { PageHeader } from '../components/PageHeader'
 import { buildReportPdf, fileSafe } from '../lib/reportPdf'
 import { castCrewReport } from '../lib/reports'
 import { supabase } from '../lib/supabase'
@@ -45,11 +46,6 @@ function RowDialog({ row, contact, rows, onClose, onSaved }: DialogProps) {
   const former = row ? isFormer(row) : false
   const depts = useMemo(() => departmentOptions(b.teams.map((t) => t.name), rows), [b.teams, rows])
 
-  useEffect(() => {
-    const h = (e: KeyboardEvent) => { if (e.key === 'Escape') onClose() }
-    document.addEventListener('keydown', h)
-    return () => document.removeEventListener('keydown', h)
-  }, [onClose])
 
   function pickAccount(id: string) {
     setAccount(id)
@@ -100,8 +96,7 @@ function RowDialog({ row, contact, rows, onClose, onSaved }: DialogProps) {
   const dis = !editable || busy
   const field = (id: string, text: string, node: React.ReactNode, hint?: string) => <div className="lb-field"><label htmlFor={id}>{text}</label>{node}{hint && <span className="lb-caption">{hint}</span>}</div>
   return (
-    <div className="lb-scrim" onMouseDown={(e) => { if (e.target === e.currentTarget) onClose() }}>
-      <div className="lb-dialog lb-dialog--wide" role="dialog" aria-modal="true" aria-label={row ? 'Cast and crew row' : 'New cast or crew row'}>
+    <Dialog bare wide title={row ? 'Cast and crew row' : 'New cast or crew row'} onClose={onClose}>
         <div className="lb-spread">
           <h2 className="lb-heading" style={{ margin: 0 }}>{row ? (displayName(row) || row.role || 'Row') : 'Add a person'}</h2>
           <span className="lb-row">
@@ -169,8 +164,7 @@ function RowDialog({ row, contact, rows, onClose, onSaved }: DialogProps) {
             {editable && <button className="lb-btn lb-btn--primary" disabled={busy} onClick={save}>{busy ? 'Saving' : row ? 'Save' : 'Add'}</button>}
           </span>
         </div>
-      </div>
-    </div>
+      </Dialog>
   )
 }
 
@@ -183,7 +177,6 @@ export default function CastCrew() {
   const contacts = q.data?.contacts ?? new Map<string, CrewContact>()
   const def = SECTIONS.find((s) => s.path === 'cast')!
   const st = navState(b, def)
-  const level = levelFor(b, 'cast_crew')
   const mine = teamsICanEditCrew(b)
   const [open, setOpen] = useState<{ id: string | null } | null>(null)
   const [show, setShow] = useState<CrewKind>('crew')   // the page opens on Crew; Cast is one click away
@@ -191,26 +184,12 @@ export default function CastCrew() {
   const [note, setNote] = useState<string | null>(null)
   const [error, setError] = useState<string | null>(null)
   const refresh = () => { void qc.invalidateQueries({ queryKey: ['castcrew', pid] }) }
-  const phone = useMedia('(max-width: 639px)')
   const pdf = useReportDownload(fileSafe(b.project.name) + '-cast-and-crew', (size) => buildReportPdf(castCrewReport({ project: b.project.name, size, rows, contacts, withContacts: seeContacts, teams: b.teams })))
 
-  const head = (
-    <div className="lb-page-head">
-      <h1 className="lb-title">Cast and crew</h1>
-      {st.locked ? <Permission level="locked" why="No access" /> : <Permission level={level === 'edit' ? 'edit' : 'view'} />}
-      {phone && !st.locked && (
-        <PageMenu label="Cast and crew actions" items={[
-          { label: 'Add person', icon: 'plus', hidden: mine.length === 0, onClick: () => setOpen({ id: null }) },
-          { label: 'Detect cast from the script', icon: 'users', hidden: mine.length === 0 || show !== 'cast', onClick: () => void detect() },
-          { label: 'Download cast and crew PDF', icon: 'download', hidden: rows.length === 0, onClick: () => void pdf.go() },
-        ]} />
-      )}
-    </div>
-  )
   if (st.locked) {
     return (
       <>
-        {head}
+        <PageHeader title="Cast and crew" />
         <EmptyState title="Cast and crew is not open to your team" action={isOwnerOrAdmin(b) ? <Link className="lb-btn" to="../team">Open Team and access</Link> : undefined}>The admin can change this in Team and access.</EmptyState>
       </>
     )
@@ -235,30 +214,24 @@ export default function CastCrew() {
   const counts = { cast: rows.filter((r) => r.kind === 'cast').length, crew: rows.filter((r) => r.kind === 'crew').length }
   return (
     <>
-      {head}
-      <p className="lb-caption lb-phone-hide">One list for the whole project. Names, roles and call times are visible to everyone who can see this page. Phone and email are visible only to the admins and the AD team. Each row is managed by one team, and only that team edits it.</p>
-      <div className="lb-row">
-        <div className="lb-seg" role="group" aria-label="Show">
-          {([['cast', `Cast ${counts.cast}`], ['crew', `Crew ${counts.crew}`]] as const).map(([k, l]) => (
-            <button key={k} type="button" aria-pressed={show === k} aria-current={show === k ? 'true' : undefined} onClick={() => setShow(k)}>{l}</button>
-          ))}
-        </div>
-        {show === 'crew' && <select className="lb-input" style={{ width: 'auto' }} aria-label="Department" value={teamFilter} onChange={(e) => setTeamFilter(e.target.value)}>
-          <option value="">All departments</option>{[...new Set(rows.filter((r) => r.kind === 'crew').map((r) => r.department).filter(Boolean))].sort().map((d) => <option key={d} value={d}>{d}</option>)}
-        </select>}
-        <span className="lb-grow" style={{ flex: 1 }} />
-        {!phone && mine.length > 0 && (
-          <>
-            {show === 'cast' && <button className="lb-btn" onClick={detect}>Detect cast from the script</button>}
-            <button className="lb-btn lb-btn--primary" onClick={() => setOpen({ id: null })}><Icon name="plus" /> Add person</button>
-          </>
-        )}
-      </div>
+      <PageHeader title="Cast and crew"
+        info={<><span><b>{counts.cast}</b> cast</span><span><b>{counts.crew}</b> crew</span></>}
+        menu={st.locked ? undefined : [
+          { label: 'Add person', icon: 'plus', hidden: mine.length === 0, onClick: () => setOpen({ id: null }) },
+          { label: 'Detect cast from the script', icon: 'users', hidden: mine.length === 0 || show !== 'cast', onClick: () => void detect() },
+          { label: 'Download cast and crew PDF', icon: 'download', hidden: rows.length === 0, onClick: () => void pdf.go() },
+        ]}
+        quick={<>
+          <div className="lb-seg" role="group" aria-label="Show">
+            {([['cast', `Cast ${counts.cast}`], ['crew', `Crew ${counts.crew}`]] as const).map(([k, l]) => (
+              <button key={k} type="button" aria-pressed={show === k} aria-current={show === k ? 'true' : undefined} onClick={() => setShow(k)}>{l}</button>
+            ))}
+          </div>
+          {show === 'crew' && <select className="lb-input" style={{ width: 'auto' }} aria-label="Department" value={teamFilter} onChange={(e) => setTeamFilter(e.target.value)}>
+            <option value="">All departments</option>{[...new Set(rows.filter((r) => r.kind === 'crew').map((r) => r.department).filter(Boolean))].sort().map((d) => <option key={d} value={d}>{d}</option>)}
+          </select>}
+        </>} />
       {pdf.error && <p className="lb-error" role="alert">{pdf.error}</p>}
-      {!phone && <div className="lb-row" style={{ justifyContent: 'flex-end' }}>
-        <ReportButton label="Download cast and crew PDF" file={fileSafe(b.project.name) + '-cast-and-crew'} disabled={rows.length === 0}
-          build={(size) => buildReportPdf(castCrewReport({ project: b.project.name, size, rows, contacts, withContacts: seeContacts, teams: b.teams }))} />
-      </div>}
       {note && <p className="lb-caption" role="status">{note}</p>}
       {error && <p className="lb-error" role="alert">{error}</p>}
       {rows.length === 0 && !q.isLoading && <EmptyState title="Nobody on the list yet">Add people one at a time, or detect the cast from the speaking characters in the script.</EmptyState>}

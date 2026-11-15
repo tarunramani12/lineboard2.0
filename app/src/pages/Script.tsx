@@ -1,12 +1,12 @@
-import { useEffect, useMemo, useRef, useState, type ReactElement } from 'react'
+import { useEffect, useMemo, useRef, useState, type ReactElement, type ReactNode } from 'react'
 import { Link, useLocation, useNavigate, useOutletContext } from 'react-router-dom'
 import { useQueryClient } from '@tanstack/react-query'
 import { navState, type Ctx } from '../components/ProjectLayout'
-import { Badge, Banner, Dialog, EmptyState, Icon, PageMenu, Permission, SceneChip, useAction } from '../components/ui'
+import { Badge, Banner, Dialog, EmptyState, Icon, Permission, SceneChip, useAction } from '../components/ui'
 import { SceneNav } from '../components/SceneNav'
 import { Mark, SceneFind, useSceneFind } from '../components/SceneFind'
 import { matchScene, sceneText } from '../lib/sceneSearch'
-import { useTopbarHeight } from '../lib/useTopbarHeight'
+import { PageHeader } from '../components/PageHeader'
 import { useMedia } from '../components/ProjectLayout'
 import { removeFolder } from '../lib/storyboard'
 import { ELEMENT_LABELS, LINES_PER_PAGE, estimateLines, looksLikeHeading, parseFountain, toFountain, type Element } from '../lib/fountain'
@@ -357,8 +357,6 @@ export default function Script() {
   const navAct = useAction()
   const [lockDialog, setLockDialog] = useState(false)
   const canWrite = canEdit && !writing
-  // On a phone the Scenes button stays under the top bar while the page scrolls, so it is never out of reach.
-  const barTop = useTopbarHeight()
   const menuItems = [
     { label: 'Write a scene', icon: 'plus' as const, hidden: !canWrite, onClick: () => startWriting(null) },
     { label: scenes.length ? 'Import a new draft' : 'Import a script', icon: 'download' as const, hidden: !isOwner(b) || Boolean(writing), onClick: () => navigate('import') },
@@ -369,25 +367,21 @@ export default function Script() {
     // The lock lives in this menu on a phone; larger screens keep the button beside the status badge.
     { label: locked ? 'Unlock script' : 'Lock script', icon: (locked ? 'unlock' : 'lock') as 'unlock' | 'lock', hidden: !isOwner(b), onClick: () => { navAct.setError(null); setLockDialog(true) } },
   ]
-  const head = (
-    <div className="lb-page-head">
-      <h1 className="lb-title">Script</h1>
-      <div className="lb-row">
-        {locked ? <Badge kind="locked">Locked</Badge> : <Badge kind="plain">Unlocked</Badge>}
-        {isOwner(b) && !st.locked && !phone && (
-          <button type="button" className="lb-btn lb-btn--icon" aria-label={locked ? 'Unlock script' : 'Lock script'} title={locked ? 'Unlock script' : 'Lock script'} onClick={() => { navAct.setError(null); setLockDialog(true) }}><Icon name={locked ? 'unlock' : 'lock'} /></button>
-        )}
-        {locked && <span className="lb-revtag" style={{ '--rev': revisionColour(b.project.revision_no) } as CSSProperties} title="Changes saved now are marked in this revision">Revision: {revisionLabel(b.project.revision_no)}</span>}
-        {st.locked ? <Permission level="locked" why="No access" /> : <Permission level={canEdit ? 'edit' : 'view'} />}
-        {phone && !st.locked && <PageMenu label="Script actions" items={menuItems} />}
-      </div>
-    </div>
+  // The info bar shows facts only; every action is in the hamburger (menuItems); the quick bar holds search, scenes and zoom.
+  const info = (
+    <>
+      {locked ? <Badge kind="locked">Locked</Badge> : <Badge kind="plain">Unlocked</Badge>}
+      {locked && <span className="lb-revtag" style={{ '--rev': revisionColour(b.project.revision_no) } as CSSProperties} title="Changes saved now are marked in this revision">Revision: {revisionLabel(b.project.revision_no)}</span>}
+      {!st.locked && totalLines > 0 && <span className="lb-phone-hide">{aboutPages(totalLines)}</span>}
+      {!st.locked && runtime && <span className="lb-phone-hide">Target <b>{runtime}</b></span>}
+    </>
   )
+  const header = (quick?: ReactNode) => <PageHeader title="Script" info={info} menu={st.locked ? undefined : menuItems} quick={quick} />
 
   if (st.locked) {
     return (
       <>
-        {head}
+        {header()}
         <EmptyState title="The script is not open to your team"
           action={isOwnerOrAdmin(b) ? <Link className="lb-btn" to="../team">Open Team and access</Link> : undefined}>
           The admin can change this in Team and access.
@@ -447,52 +441,37 @@ export default function Script() {
   }
   const navProps = { scenes, activeId, onGo: goTo, canEdit, locked, onDelete: deleteScene, onStatus: setStatus }
 
-  const anyReadable = active.some((s) => readable(s.id))
   // Search: number, heading and, only for scenes this person may read, the words. Locked and omitted scenes match on the heading alone.
   const found = (s: Scene, idx: number) => matchScene(find.q, {
     number: s.display_number ?? idx + 1, heading: s.heading,
     text: s.status !== 'omitted' && readable(s.id) ? sceneText(texts.data?.get(s.id)?.elements ?? []) : undefined,
   })
   const shownCount = find.q ? scenes.filter(found).length : scenes.length
-  return (
+  const quickBar = scenes.length > 0 ? (
     <>
-      {head}
-      <p className="lb-caption lb-phone-hide">Everyone on the project sees every scene heading. Action and dialogue show only for scenes shared with you. One person writes a scene at a time. Scenes get their numbers when the admin locks the script.</p>
-      <div className="lb-row">
-        {!phone && canEdit && !writing && <button className="lb-btn lb-btn--primary" onClick={() => startWriting(null)}><Icon name="plus" /> Write a scene</button>}
-        {!phone && isOwner(b) && !writing && <Link className="lb-btn" to="import">{scenes.length ? 'Import a new draft' : 'Import a script'}</Link>}
-        {!phone && (anyReadable || active.length > 0) && <button className="lb-btn" onClick={() => { setExportError(null); setExportOpen(true) }}><Icon name="download" /> Download</button>}
-        {!phone && canStartRevision && <button className="lb-btn" onClick={() => setNextRevDialog(true)}>Start next revision</button>}
-        {totalLines > 0 && <span className="lb-caption">{aboutPages(totalLines)} in the scenes you can read</span>}
-        {(runtime || canSetRuntime) && (
-          <span className="lb-caption lb-runtime">
-            {runtime ? <>Target runtime <b>{runtime}</b></> : 'No target runtime'}
-            {canSetRuntime && !phone && <button type="button" className="lb-btn lb-btn--sm lb-btn--quiet" onClick={openRuntime}>{runtime ? 'Change' : 'Set'}</button>}
-          </span>
-        )}
-      </div>
-      {navAct.error && !lockDialog && <p className="lb-error" role="alert">{navAct.error}</p>}
-      {scenes.length > 0 && (
-        <div className="lb-scriptbar" style={{ top: barTop + 6 }}>
-          {phone
-            ? <button type="button" className="lb-btn lb-btn--icon" aria-label={`Scenes, ${active.length}`} title="Scenes" aria-haspopup="dialog" onClick={() => setSheetOpen(true)}><Icon name="scenes" /></button>
-            : <button type="button" className="lb-btn lb-btn--icon" aria-label={navCollapsed ? 'Show the scene list' : 'Hide the scene list'} title={navCollapsed ? 'Show the scene list' : 'Hide the scene list'} aria-pressed={!navCollapsed} onClick={toggleNav}><Icon name="scenes" /></button>}
-          <SceneFind find={find} shown={shownCount} inline />
-          {!find.open && (
-            <div className="lb-zoomwrap">
-              {zoomOpen && (
-                <div className="lb-zoom-menu" role="listbox" aria-label="Zoom level">
-                  {[...ZOOM_STEPS].reverse().map((z) => (
-                    <button key={z} type="button" role="option" aria-selected={zoom.value === z} className={zoom.value === z ? 'is-on' : ''} onClick={() => { zoom.setValue(z); setZoomOpen(false) }}>{z}%</button>
-                  ))}
-                  <button type="button" role="option" aria-selected={zoom.value === 'fit'} className={zoom.value === 'fit' ? 'is-on' : ''} onClick={() => { zoom.setValue('fit'); setZoomOpen(false) }}>Fit width</button>
-                </div>
-              )}
-              <button type="button" className="lb-zoom-pill" aria-haspopup="listbox" aria-expanded={zoomOpen} aria-label={`Zoom ${zoom.percent} percent`} title="Zoom (Ctrl or Cmd and plus or minus)" onClick={() => setZoomOpen((v) => !v)}>{zoom.percent}%</button>
+      {phone
+        ? <button type="button" className="lb-btn lb-btn--icon" aria-label={`Scenes, ${active.length}`} title="Scenes" aria-haspopup="dialog" onClick={() => setSheetOpen(true)}><Icon name="scenes" /></button>
+        : <button type="button" className="lb-btn lb-btn--icon" aria-label={navCollapsed ? 'Show the scene list' : 'Hide the scene list'} title={navCollapsed ? 'Show the scene list' : 'Hide the scene list'} aria-pressed={!navCollapsed} onClick={toggleNav}><Icon name="scenes" /></button>}
+      <SceneFind find={find} shown={shownCount} />
+      {!find.open && (
+        <div className="lb-zoomwrap">
+          {zoomOpen && (
+            <div className="lb-zoom-menu" role="listbox" aria-label="Zoom level">
+              {[...ZOOM_STEPS].reverse().map((z) => (
+                <button key={z} type="button" role="option" aria-selected={zoom.value === z} className={zoom.value === z ? 'is-on' : ''} onClick={() => { zoom.setValue(z); setZoomOpen(false) }}>{z}%</button>
+              ))}
+              <button type="button" role="option" aria-selected={zoom.value === 'fit'} className={zoom.value === 'fit' ? 'is-on' : ''} onClick={() => { zoom.setValue('fit'); setZoomOpen(false) }}>Fit width</button>
             </div>
           )}
+          <button type="button" className="lb-zoom-pill" aria-haspopup="listbox" aria-expanded={zoomOpen} aria-label={`Zoom ${zoom.percent} percent`} title="Zoom (Ctrl or Cmd and plus or minus)" onClick={() => setZoomOpen((v) => !v)}>{zoom.percent}%</button>
         </div>
       )}
+    </>
+  ) : undefined
+  return (
+    <>
+      {header(quickBar)}
+      {navAct.error && !lockDialog && <p className="lb-error" role="alert">{navAct.error}</p>}
       <div className={'lb-scriptlayout' + (phone || scenes.length === 0 ? ' is-single' : '') + (navCollapsed ? ' is-collapsed' : '')}>
       {!phone && scenes.length > 0 && <aside className="lb-scenenav-wrap"><SceneNav {...navProps} collapsed={navCollapsed} onToggle={toggleNav} /></aside>}
       <div className="lb-scriptmain" ref={zoom.setEl}>

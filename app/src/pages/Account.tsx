@@ -14,6 +14,7 @@ import { useIsAppAdmin } from '../lib/usage'
 import { InstallHint } from '../components/InstallHint'
 import { useMyJoinRequests, whoDecides, type CodeLookup } from '../lib/joinRequests'
 import { DEPARTMENT_ORDER } from '../lib/sections'
+import { PageHeader } from '../components/PageHeader'
 
 export function AuthFrame({ title, children, footer }: { title: string; children: ReactNode; footer?: ReactNode }) {
   return (
@@ -23,7 +24,7 @@ export function AuthFrame({ title, children, footer }: { title: string; children
         <p className="lb-caption">From script to call sheet, shared with the crew.</p>
       </div>
       <div className="lb-card lb-card--zebra lb-stack" style={{ padding: 24 }}>
-        <h1 className="lb-heading">{title}</h1>
+        <h1 className="lb-title">{title}</h1>
         {!supabaseConfigured && (
           <Banner kind="alert" lead="Not connected">The app has no backend address. Add it to app/.env.local.</Banner>
         )}
@@ -284,13 +285,12 @@ export function Projects() {
     <>
       <AccountBar />
       <main className="lb-account lb-account--wide">
-        <div className="lb-page-head">
-          <h1 className="lb-title">Projects</h1>
-          <div className="lb-row">
-            <Link to="/join" className="lb-btn">Join with a code</Link>
-            <button className="lb-btn lb-btn--primary" disabled={blocked} onClick={() => { setCreating(true); setError(null) }}><Icon name="plus" /> New project</button>
-          </div>
-        </div>
+        <PageHeader title="Projects"
+          info={list.data ? <span><b>{list.data.length}</b> {list.data.length === 1 ? 'project' : 'projects'}</span> : undefined}
+          menu={[
+            { label: 'New project', icon: 'plus', disabled: blocked, onClick: () => { setCreating(true); setError(null) } },
+            { label: 'Join with a code', icon: 'users', onClick: () => nav('/join') },
+          ]} />
         <InstallHint />
         {blocked && <p className="lb-caption" role="status">{blockedNote}</p>}
         {list.isLoading && <p className="lb-caption">Loading your projects</p>}
@@ -502,7 +502,7 @@ export function Settings() {
     <>
       <AccountBar back />
       <main className="lb-account">
-        <h1 className="lb-title">Account settings</h1>
+        <PageHeader title="Account settings" />
         {saved && <Banner lead="Saved">{saved}</Banner>}
         <form className="lb-card lb-stack" onSubmit={saveName}>
           <h2 className="lb-heading">Profile</h2>

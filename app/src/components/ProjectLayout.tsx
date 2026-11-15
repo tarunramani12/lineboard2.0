@@ -27,7 +27,7 @@ export function navState(b: Bundle, s: SectionDef): { locked: boolean; tag: stri
 }
 
 /** Short names for the phone bar, where each item is narrow. */
-const DOCK_NAME: Record<string, string> = { '': 'Overview', script: 'Script', shots: 'Shots', storyboard: 'Boards', bible: 'Bible', breakdown: 'Breakdown', cast: 'Cast', locations: 'Locations', props: 'Props', equipment: 'Gear', schedule: 'Schedule', callsheets: 'Call sheets', team: 'Team', export: 'Settings' }
+const DOCK_NAME: Record<string, string> = { '': 'Overview', script: 'Script', shots: 'Shots', bible: 'Bible', breakdown: 'Breakdown', cast: 'Cast', locations: 'Locations', props: 'Props', equipment: 'Gear', schedule: 'Schedule', callsheets: 'Call sheets', team: 'Team', export: 'Settings' }
 
 /** Phone only: one row along the bottom that swipes sideways. The current section scrolls into view. */
 function SectionDock({ b, pid, pending }: { b: Bundle; pid: string; pending: number }) {

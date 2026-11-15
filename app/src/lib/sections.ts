@@ -10,8 +10,7 @@ export interface SectionDef {
 export const SECTIONS: SectionDef[] = [
   { path: '', icon: 's_overview', label: 'Overview', key: null, fixed: 'everyone', phoneSlot: 'home' },
   { path: 'script', icon: 's_script', label: 'Script', key: 'script' },
-  { path: 'shots', icon: 's_shots', label: 'Shot list', key: 'shots', phoneSlot: 'shots' },
-  { path: 'storyboard', icon: 's_storyboard', label: 'Storyboard', key: 'shots' },
+  { path: 'shots', icon: 's_shots', label: 'Shots', key: 'shots', phoneSlot: 'shots' },
   { path: 'breakdown', icon: 's_breakdown', label: 'Breakdown', key: 'breakdown' },
   { path: 'cast', icon: 's_cast', label: 'Cast and crew', key: 'cast_crew' },
   { path: 'locations', icon: 's_locations', label: 'Locations', key: 'locations' },

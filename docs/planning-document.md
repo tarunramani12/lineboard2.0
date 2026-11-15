@@ -298,6 +298,8 @@ Final Draft marks revisions on pages with colours and margin asterisks. LineBoar
 
 ### Shot list
 
+> **Decision 2026-11-16: the Shot list and the Storyboard are one page, called Shots.** Each shot is one row with its frame picture at the start; opening a shot gives one dialog with two tabs, Details and Frame. One permission (Shot list and storyboard) already covered both. The shot list PDF and the storyboard PDF are both in the page menu. `/storyboard` opens Shots. Where this section describes a separate Storyboard page, read it as the Frame tab and the storyboard PDF of Shots.
+
 - Shots are grouped by scene. Numbers read scene-shot (42-1, 42-2) and count within a scene.
 - Rows are created, edited, duplicated and reordered by drag within a scene.
 - Each row shows: shot number, description, size and movement, lens, owning team, status.
@@ -340,6 +342,8 @@ The shot's owning team edits the shot. The VFX team and the Sound team can add t
 - Dropped shots read struck through and muted. The daily list shows a count of done, dropped and planned shots.
 
 ## 11. Storyboard
+
+> **Decision 2026-11-16: the Shot list and the Storyboard are one page, called Shots.** Each shot is one row with its frame picture at the start; opening a shot gives one dialog with two tabs, Details and Frame. One permission (Shot list and storyboard) already covered both. The shot list PDF and the storyboard PDF are both in the page menu. `/storyboard` opens Shots. Where this section describes a separate Storyboard page, read it as the Frame tab and the storyboard PDF of Shots.
 
 - A grid of frames per scene and per shot.
 - Image upload with compression. Each frame can hold up to 4 photo layers plus pen drawing, flattened when the frame is marked done and on export (carried over from v1).
@@ -508,7 +512,7 @@ Parked until the base and the first features work. Nothing here is built now, bu
 
 ### Navigation
 
-Inside a project, a persistent navigation: Overview, Script, Shot list, Storyboard, Breakdown, Cast and crew, Props, Equipment, Schedule, Call sheets, Team and access, Export and settings. Each section shows only what the viewer may see. Sections without access stay in the list with a lock. They are never hidden or broken. On desktop and landscape tablet the list is a full-height gray column that can collapse to an icon rail. On portrait tablet it starts as the icon rail. The open and close toggle works everywhere the list is at the side. Only on a phone (under 640px wide) does it move to the bottom, as a fixed grid of icons with no scrolling.
+Inside a project, a persistent navigation: Overview, Script, Shots (shot list and storyboard in one page), Storyboard, Breakdown, Cast and crew, Props, Equipment, Schedule, Call sheets, Team and access, Export and settings. Each section shows only what the viewer may see. Sections without access stay in the list with a lock. They are never hidden or broken. On desktop and landscape tablet the list is a full-height gray column that can collapse to an icon rail. On portrait tablet it starts as the icon rail. The open and close toggle works everywhere the list is at the side. Only on a phone (under 640px wide) does it move to the bottom, as a fixed grid of icons with no scrolling.
 
 ### Account screens
 

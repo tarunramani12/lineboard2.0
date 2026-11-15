@@ -59,14 +59,22 @@ Built and browser-tested 2026-11-14: database (0038, 0039 applied), page, photos
 - [ ] Owner to look at it on a real phone and in dark mode (Chrome checks passed at 1280 and 390 wide)
 - [ ] Filter button next to the search (owner asked to keep this for later): INT / EXT, DAY / NIGHT, DAWN / DUSK from the heading (`headingParts()` in `lib/schedule.ts`), plus "Revised" on Script and "No shots yet" on Shot list and Storyboard; OR within a group, AND across groups, combined with the search; badge on the button shows how many are on
 
-## Design consistency fixes (from the 2026-11-15 audit; owner to choose which to do)
-- [ ] Use the shared `Dialog` in the seven pages that build their own modal (Breakdown, CastCrew, Items, Locations, Schedule, ShotList, Storyboard)
-- [ ] Replace hard-coded colours with tokens (`#fff`/`#000`, top bar greys, swipe delete red, pen colours); one red
-- [ ] Decide on the three fully round pills (`.lb-stag`, `.lb-chipx`, `.lb-chg`) and loose radii
-- [ ] Merge the duplicate CSS rule blocks (29 selectors defined twice or more)
-- [ ] `lb-title` on the sign-in and legal page headings; "Open Schedule" to "Open the Schedule"
-- [ ] Move repeated inline styles (CallSheets, TeamAccess, Schedule, Items) into classes
-- [ ] Cast and crew: check the Cast and Crew views on a phone and tablet after deploy (built 2026-11-15, not deployed)
+## Shots page (merged 2026-11-16)
+- [ ] Owner to check on a phone and a tablet: the rows with pictures, opening a shot (Details and Frame tabs), drawing a frame, Mark done and Reopen, both PDFs, the picture size limit, drag to reorder
+- [ ] Tablet portrait (640 to 899 px): the size, lens and team cells stack on separate lines in a shot row; put them on one muted line like on a phone
+
+## Static page header (built 2026-11-16, NOT deployed, NOT committed)
+- [x] Deployed 2026-11-16 (deployment 2ca81194). [ ] Owner: say "commit" to save the page header, design pass and page bar to GitHub
+- [ ] Owner to check every page on a phone and a tablet after deploy: Script, Shot list, Storyboard, Cast and crew, Locations, Props, Equipment, Breakdown, Project bible, Schedule, Call sheets, Team and access, Overview, Projects, Account settings, Usage
+- [ ] Delete the unused `.lb-page-head` CSS rules
+- [ ] Decide: keep the Props and Equipment copy row and the Call sheet publish buttons in the page content, or move them into the hamburger
+
+## Design consistency fixes (2026-11-16)
+- [x] Shared Dialog in all pages; tokens for the hard-coded colours; one pen palette; round chips and loose radii; duplicate CSS removed; heading classes and wording (deployed)
+- [x] Opaque page bar (scene list, fold all, search, zoom) on Script, Shot list and Storyboard (deployed)
+- [ ] COMMIT AND PUSH (owner asked again on 2026-11-16; see the end of summary.md for the result)
+- [ ] Move the repeated inline styles (CallSheets 31, TeamAccess 29, Schedule 17, Items 15) into classes
+- [ ] Owner to check on devices: the page bar on the Script, Shot list and Storyboard (phone and tablet), the pop-up windows (Escape, phone), the round chips now with small corners
 
 ## Later / waiting
 - [ ] Delete the unused `u6835386282@id.gle` Google account (myaccount.google.com, Data & privacy, Delete your Google Account). Owner, after the Gmail account exists.

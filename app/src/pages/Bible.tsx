@@ -2,13 +2,14 @@ import { useEffect, useMemo, useRef, useState } from 'react'
 import { useOutletContext } from 'react-router-dom'
 import { useQueryClient } from '@tanstack/react-query'
 import { navState, type Ctx } from '../components/ProjectLayout'
-import { Badge, Choice, Dialog, EmptyState, Icon, Permission, useAction } from '../components/ui'
+import { Badge, Choice, Dialog, EmptyState, Icon, useAction } from '../components/ui'
 import { ASPECT_PRESETS, normalizeRatio } from '../lib/aspect'
 import {
   CAMERA_FORMATS, DELIVERY_FORMATS, FRAME_RATES, RESOLUTIONS, bibleOwnerTeam, canEditBibleArea, draftFrom, reorderIds, removeMoodFiles, sameDraft, uploadMoodImage, type BibleArea,
   useBibleFormat, useMoodUrls, useMoodboard, type FormatDraft, type MoodItem,
 } from '../lib/bible'
-import { ReportButton } from '../components/ReportButton'
+import { useReportDownload } from '../components/ReportButton'
+import { PageHeader } from '../components/PageHeader'
 import { bibleFileName, buildBiblePdf } from '../lib/biblePdf'
 import { friendlyError } from '../lib/errors'
 import { isOwnerOrAdmin, type Bundle } from '../lib/project'
@@ -305,26 +306,23 @@ export default function Bible() {
   const ratio = b.project.aspect_ratio ?? '16:9'
   const formatQ = useBibleFormat(pid, !st.locked)
   const moodQ = useMoodboard(pid, !st.locked)
+  const pdf = useReportDownload(bibleFileName(b.project.name), () => buildBiblePdf({ project: b.project.name, ratio, format: formatQ.data ?? null, items: moodQ.data ?? [], withMoodboard: true }))
   return (
     <>
-      <div className="lb-page-head">
-        <h1 className="lb-title">Project bible</h1>
-        <div className="lb-row">{st.locked ? <Permission level="locked" why="No access" /> : <Permission level={(tab === 'format' ? canEditFormat : canEditMood) ? 'edit' : 'view'} />}</div>
-      </div>
-      {st.locked ? (
-        <EmptyState title="The Project bible is not open to your team">The admin can change this in Team and access.</EmptyState>
-      ) : (
-        <>
-          <p className="lb-caption lb-phone-hide">The shape, speed and look of the film in one place. The Camera team manages the format and the Direction team manages the moodboard, unless the admin hands a part to another team.</p>
+      <PageHeader title="Project bible"
+        info={st.locked ? undefined : <span>{tab === 'format' ? 'Format' : 'Moodboard'}</span>}
+        menu={st.locked ? undefined : [{ label: 'Download Project bible PDF', icon: 'download', onClick: () => void pdf.go() }]}
+        quick={st.locked ? undefined : (
           <div className="lb-seg" role="group" aria-label="Project bible">
             <button type="button" aria-pressed={tab === 'format'} onClick={() => setTab('format')}>Format</button>
             <button type="button" aria-pressed={tab === 'mood'} onClick={() => setTab('mood')}>Moodboard</button>
           </div>
-          <div className="lb-row" style={{ justifyContent: 'space-between' }}>
-            <OwnerLine b={b} pid={pid} area={tab} />
-            <ReportButton label="Download Project bible PDF" file={bibleFileName(b.project.name)}
-              build={() => buildBiblePdf({ project: b.project.name, ratio, format: formatQ.data ?? null, items: moodQ.data ?? [], withMoodboard: true })} />
-          </div>
+        )} />
+      {st.locked ? (
+        <EmptyState title="The Project bible is not open to your team">The admin can change this in Team and access.</EmptyState>
+      ) : (
+        <>
+          <OwnerLine b={b} pid={pid} area={tab} />
           {tab === 'format'
             ? <FormatTab pid={pid} ratio={ratio} canEdit={canEditFormat} hasFrames={frames.isLoading || (frames.data?.size ?? 0) > 0} />
             : <MoodTab pid={pid} canEdit={canEditMood} capMb={b.project.image_cap_mb ?? 200} otherBytes={frameBytes} showUsage={isOwnerOrAdmin(b)} />}
